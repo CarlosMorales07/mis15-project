@@ -15,8 +15,11 @@ async function uploadOne(
     id:
       string;
 
-    blob:
-      Blob;
+    buffer:
+      ArrayBuffer;
+
+    mimeType:
+      string;
 
     filename:
       string;
@@ -28,7 +31,9 @@ async function uploadOne(
 
 
   /*
-   * 1. Pedimos firma
+   * =====================================================
+   * 1. PEDIR FIRMA
+   * =====================================================
    */
 
   const signed =
@@ -53,7 +58,9 @@ async function uploadOne(
     );
 
 
-  if (!signed.ok) {
+  if (
+    !signed.ok
+  ) {
 
     throw new Error(
       "No se pudo autorizar la subida."
@@ -68,8 +75,35 @@ async function uploadOne(
 
 
   /*
-   * 2. Subimos DIRECTAMENTE
-   * navegador → Cloudinary
+   * =====================================================
+   * 2. RECONSTRUIR BLOB
+   * =====================================================
+   *
+   * IndexedDB guarda ArrayBuffer.
+   * Antes de subirlo reconstruimos el Blob.
+   */
+
+  const blob =
+    new Blob(
+
+      [
+        item.buffer
+      ],
+
+      {
+        type:
+          item.mimeType ||
+          "image/jpeg"
+      }
+
+    );
+
+
+
+  /*
+   * =====================================================
+   * 3. SUBIR DIRECTAMENTE A CLOUDINARY
+   * =====================================================
    */
 
   const form =
@@ -78,7 +112,7 @@ async function uploadOne(
 
   form.append(
     "file",
-    item.blob,
+    blob,
     item.filename
   );
 
@@ -127,7 +161,23 @@ async function uploadOne(
     );
 
 
-  if (!cloud.ok) {
+  if (
+    !cloud.ok
+  ) {
+
+    const cloudError =
+      await cloud
+        .text()
+        .catch(
+          () => ""
+        );
+
+
+    console.error(
+      "Cloudinary error:",
+      cloudError
+    );
+
 
     throw new Error(
       "Cloudinary rechazó la fotografía."
@@ -142,7 +192,9 @@ async function uploadOne(
 
 
   /*
-   * 3. Confirmamos
+   * =====================================================
+   * 4. CONFIRMAR EN SUPABASE
+   * =====================================================
    */
 
   const confirmed =
@@ -181,7 +233,23 @@ async function uploadOne(
     );
 
 
-  if (!confirmed.ok) {
+  if (
+    !confirmed.ok
+  ) {
+
+    const confirmError =
+      await confirmed
+        .text()
+        .catch(
+          () => ""
+        );
+
+
+    console.error(
+      "Confirm error:",
+      confirmError
+    );
+
 
     throw new Error(
       "No se pudo registrar la fotografía."
@@ -190,10 +258,22 @@ async function uploadOne(
   }
 
 
+  /*
+   * =====================================================
+   * 5. BORRAR DE LA COLA
+   * =====================================================
+   */
+
   await queueDelete(
     item.id
   );
 
+
+  /*
+   * =====================================================
+   * 6. ACTUALIZAR UI
+   * =====================================================
+   */
 
   window.dispatchEvent(
 
@@ -261,11 +341,12 @@ export async function processQueue() {
     ) {
 
       console.error(
+        "Error procesando fotografía:",
         error
       );
 
 
-      break;
+      throw error;
 
     }
 

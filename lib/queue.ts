@@ -10,6 +10,26 @@ export type UploadQueueItem = {
   id:
     string;
 
+  buffer:
+    ArrayBuffer;
+
+  mimeType:
+    string;
+
+  filename:
+    string;
+
+  createdAt:
+    number;
+
+};
+
+
+export type UploadQueueInput = {
+
+  id:
+    string;
+
   blob:
     Blob;
 
@@ -31,7 +51,7 @@ const STORE =
 
 
 const VERSION =
-  1;
+  2;
 
 
 
@@ -46,8 +66,38 @@ async function getDb() {
     {
 
       upgrade(
-        database
+        database,
+        oldVersion
       ) {
+
+        /*
+         * Si veníamos de la versión anterior,
+         * eliminamos la cola antigua para evitar
+         * registros con Blob incompatibles.
+         */
+
+        if (
+          oldVersion <
+          2
+        ) {
+
+          if (
+            database
+              .objectStoreNames
+              .contains(
+                STORE
+              )
+          ) {
+
+            database
+              .deleteObjectStore(
+                STORE
+              );
+
+          }
+
+        }
+
 
         if (
           !database
@@ -82,16 +132,49 @@ async function getDb() {
 
 
 export async function queueAdd(
-  item: UploadQueueItem
+  item: UploadQueueInput
 ) {
 
   const db =
     await getDb();
 
 
+  /*
+   * Safari/iOS puede fallar almacenando
+   * File/Blob directamente en IndexedDB.
+   *
+   * Convertimos a ArrayBuffer antes de guardar.
+   */
+
+  const buffer =
+    await item.blob
+      .arrayBuffer();
+
+
+  const queueItem:
+    UploadQueueItem = {
+
+    id:
+      item.id,
+
+    buffer,
+
+    mimeType:
+      item.blob.type ||
+      "image/jpeg",
+
+    filename:
+      item.filename,
+
+    createdAt:
+      item.createdAt
+
+  };
+
+
   await db.put(
     STORE,
-    item
+    queueItem
   );
 
 }
