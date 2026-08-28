@@ -39,6 +39,7 @@ function getErrorMessage(
 
   }
 
+
   if (
     typeof error === "string"
   ) {
@@ -46,6 +47,7 @@ function getErrorMessage(
     return error;
 
   }
+
 
   return "Error desconocido";
 
@@ -111,6 +113,10 @@ export default function UploadPanel() {
 
     try {
 
+      /* =================================================
+         PREPARAR CADA FOTO
+         ================================================= */
+
       for (
         let index = 0;
         index < selected.length;
@@ -120,12 +126,6 @@ export default function UploadPanel() {
         const file =
           selected[index];
 
-
-        /*
-         * ===============================================
-         * PASO 1: PREPARAR IMAGEN
-         * ===============================================
-         */
 
         setStatus(
           `Preparando ${index + 1} de ${selected.length}...`
@@ -143,34 +143,27 @@ export default function UploadPanel() {
               file
             );
 
+
         } catch (
           error
         ) {
 
-          const detail =
-            getErrorMessage(
-              error
-            );
-
-
           console.error(
-            "Error en prepareImage:",
+            "Error preparando imagen:",
             error
           );
 
 
           throw new Error(
-            `PREPARACIÓN: ${detail}`
+            `No se pudo preparar la fotografía. ${getErrorMessage(error)}`
           );
 
         }
 
 
-        /*
-         * ===============================================
-         * PASO 2: GUARDAR EN COLA
-         * ===============================================
-         */
+        /* ===============================================
+           GUARDAR EN COLA SEGURA
+           =============================================== */
 
         setStatus(
           `Guardando ${index + 1} de ${selected.length}...`
@@ -195,24 +188,19 @@ export default function UploadPanel() {
 
           });
 
+
         } catch (
           error
         ) {
 
-          const detail =
-            getErrorMessage(
-              error
-            );
-
-
           console.error(
-            "Error guardando en cola:",
+            "Error guardando fotografía:",
             error
           );
 
 
           throw new Error(
-            `COLA OFFLINE: ${detail}`
+            `No se pudo guardar temporalmente la fotografía. ${getErrorMessage(error)}`
           );
 
         }
@@ -220,59 +208,94 @@ export default function UploadPanel() {
       }
 
 
-      /*
-       * ===============================================
-       * PASO 3: SUBIR
-       * ===============================================
-       */
+
+      /* =================================================
+         SIN INTERNET
+         ================================================= */
 
       if (
-        navigator.onLine
+        !navigator.onLine
       ) {
 
         setStatus(
-          "Subiendo fotografías..."
+          selected.length === 1
+            ? "Tu foto quedó guardada. Se compartirá automáticamente cuando vuelva la conexión."
+            : "Tus fotos quedaron guardadas. Se compartirán automáticamente cuando vuelva la conexión."
         );
 
 
-        try {
-
-          await processQueue();
-
-        } catch (
-          error
-        ) {
-
-          const detail =
-            getErrorMessage(
-              error
-            );
-
-
-          console.error(
-            "Error procesando cola:",
-            error
-          );
-
-
-          throw new Error(
-            `SUBIDA: ${detail}`
-          );
-
-        }
-
-
-        setStatus(
-          "¡Listo! Tus recuerdos fueron compartidos."
-        );
-
-      } else {
-
-        setStatus(
-          "Sin conexión. Las fotos quedaron guardadas y se subirán automáticamente cuando vuelva internet."
-        );
+        return;
 
       }
+
+
+
+      /* =================================================
+         INTENTAR SUBIR
+         ================================================= */
+
+      setStatus(
+        selected.length === 1
+          ? "Subiendo fotografía..."
+          : "Subiendo fotografías..."
+      );
+
+
+      const result =
+        await processQueue();
+
+
+
+      /* =================================================
+         TODO SUBIDO
+         ================================================= */
+
+      if (
+        result.pending === 0
+      ) {
+
+        setStatus(
+          selected.length === 1
+            ? "✨ ¡Listo! Tu recuerdo fue compartido."
+            : "✨ ¡Listo! Tus recuerdos fueron compartidos."
+        );
+
+
+        return;
+
+      }
+
+
+
+      /* =================================================
+         ALGUNAS QUEDARON PENDIENTES
+         ================================================= */
+
+      if (
+        result.uploaded >
+        0
+      ) {
+
+        setStatus(
+          "✨ Algunas fotos ya se compartieron. Las restantes quedaron guardadas y la app volverá a intentarlo automáticamente."
+        );
+
+
+        return;
+
+      }
+
+
+
+      /* =================================================
+         CONEXIÓN INESTABLE
+         ================================================= */
+
+      setStatus(
+        selected.length === 1
+          ? "Tu foto quedó guardada. La conexión está inestable y volveremos a intentar subirla automáticamente."
+          : "Tus fotos quedaron guardadas. La conexión está inestable y volveremos a intentar subirlas automáticamente."
+      );
 
 
     } catch (
@@ -286,13 +309,13 @@ export default function UploadPanel() {
 
 
       console.error(
-        "Error en flujo de fotografías:",
+        "Error procesando fotografías:",
         error
       );
 
 
       setStatus(
-        `No se pudo completar el proceso. ${detail}`
+        detail
       );
 
 
@@ -336,6 +359,8 @@ export default function UploadPanel() {
       "
     >
 
+      {/* TÍTULO */}
+
       <h2
         className="
           font-title
@@ -351,6 +376,8 @@ export default function UploadPanel() {
       </h2>
 
 
+      {/* SUBTÍTULO */}
+
       <p
         className="
           mt-2
@@ -364,6 +391,8 @@ export default function UploadPanel() {
         de tu galería.
       </p>
 
+
+      {/* CÁMARA */}
 
       <input
         ref={
@@ -384,6 +413,8 @@ export default function UploadPanel() {
       />
 
 
+      {/* GALERÍA */}
+
       <input
         ref={
           galleryInputRef
@@ -402,6 +433,8 @@ export default function UploadPanel() {
         }
       />
 
+
+      {/* BOTONES */}
 
       <div
         className="
@@ -499,6 +532,8 @@ export default function UploadPanel() {
 
       </div>
 
+
+      {/* ESTADO */}
 
       {
         status && (
