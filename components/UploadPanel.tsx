@@ -1,62 +1,44 @@
 "use client";
 
 import {
-  ChangeEvent,
-  useEffect,
   useRef,
   useState
 } from "react";
 
 import {
   Camera,
-  Images,
-  CloudOff
+  Images
 } from "lucide-react";
 
 import {
-  preparePhoto
+  eventConfig
+} from "@/lib/event-config";
+
+import {
+  prepareImage
 } from "@/lib/image";
 
 import {
-  queueAdd,
-  queueCount
+  queueAdd
 } from "@/lib/queue";
 
 import {
   processQueue
 } from "@/lib/uploader";
 
-import {
-  eventConfig
-} from "@/lib/event-config";
-
 
 export default function UploadPanel() {
 
-  const cameraRef =
-    useRef<HTMLInputElement>(
+  const cameraInputRef =
+    useRef<HTMLInputElement | null>(
       null
     );
 
 
-  const galleryRef =
-    useRef<HTMLInputElement>(
+  const galleryInputRef =
+    useRef<HTMLInputElement | null>(
       null
     );
-
-
-  const [
-    busy,
-    setBusy
-  ] =
-    useState(false);
-
-
-  const [
-    pending,
-    setPending
-  ] =
-    useState(0);
 
 
   const [
@@ -66,123 +48,94 @@ export default function UploadPanel() {
     useState("");
 
 
-  async function updateCount() {
-
-    setPending(
-      await queueCount()
-    );
-
-  }
+  const [
+    working,
+    setWorking
+  ] =
+    useState(false);
 
 
-  useEffect(
-    () => {
-
-      void updateCount();
-
-    },
-    []
-  );
-
-
-  async function selected(
-    event:
-      ChangeEvent<HTMLInputElement>
+  async function handleFiles(
+    files:
+      FileList | null
   ) {
 
-    const files =
-      Array.from(
-        event.target.files ??
-        []
-      );
-
-
-    event.target.value =
-      "";
-
-
-    if (!files.length) {
-
-      return;
-
-    }
-
-
     if (
-      files.length >
-      eventConfig
-        .maxFilesPerSelection
+      !files ||
+      files.length === 0
     ) {
 
-      setStatus(
-
-        `Selecciona máximo ${
-          eventConfig
-            .maxFilesPerSelection
-        } fotos.`
-
-      );
-
-
       return;
 
     }
 
 
-    setBusy(
+    const selected =
+      Array.from(
+        files
+      ).slice(
+        0,
+        eventConfig.maxFilesPerSelection
+      );
+
+
+    setWorking(
       true
+    );
+
+
+    setStatus(
+      `Preparando ${selected.length} ${
+        selected.length === 1
+          ? "foto"
+          : "fotos"
+      }...`
     );
 
 
     try {
 
+      let preparedCount =
+        0;
+
+
       for (
-        let i = 0;
-        i <
-        files.length;
-        i++
+        const file of
+        selected
       ) {
 
-        setStatus(
-
-          `Preparando ${
-            i + 1
-          } de ${
-            files.length
-          }…`
-
-        );
-
-
-        const photo =
-          await preparePhoto(
-            files[i]
+        const prepared =
+          await prepareImage(
+            file
           );
-
-
-        const id =
-          crypto.randomUUID();
 
 
         await queueAdd({
 
-          id,
+          id:
+            crypto.randomUUID(),
 
           blob:
-            photo,
+            prepared,
 
           filename:
-            `${id}.jpg`,
+            prepared.name,
 
           createdAt:
-            Date.now() + i
+            Date.now()
 
         });
 
+
+        preparedCount +=
+          1;
+
+
+        setStatus(
+          `Preparando ${preparedCount} de ${selected.length}...`
+        );
+
       }
-
-
-      await updateCount();
 
 
       if (
@@ -190,7 +143,7 @@ export default function UploadPanel() {
       ) {
 
         setStatus(
-          "Compartiendo tus recuerdos…"
+          "Compartiendo recuerdos..."
         );
 
 
@@ -198,41 +151,58 @@ export default function UploadPanel() {
 
 
         setStatus(
-          "Tus recuerdos fueron compartidos ✨"
+          "¡Listo! Tus recuerdos se están mostrando en la galería."
         );
 
       } else {
 
         setStatus(
-          "Sin conexión. Tus fotografías están seguras y se compartirán automáticamente cuando vuelva internet."
+          "Sin conexión. Las fotos quedaron guardadas y se subirán automáticamente cuando vuelva internet."
         );
 
       }
-
-
-      await updateCount();
 
 
     } catch (
       error
     ) {
 
+      console.error(
+        "Error preparando fotografías:",
+        error
+      );
+
+
       setStatus(
-
-        error instanceof Error
-
-          ? error.message
-
-          : "Ocurrió un error."
-
+        "No pudimos preparar una de las fotografías. Inténtalo nuevamente."
       );
 
 
     } finally {
 
-      setBusy(
+      setWorking(
         false
       );
+
+
+      if (
+        cameraInputRef.current
+      ) {
+
+        cameraInputRef.current.value =
+          "";
+
+      }
+
+
+      if (
+        galleryInputRef.current
+      ) {
+
+        galleryInputRef.current.value =
+          "";
+
+      }
 
     }
 
@@ -241,52 +211,91 @@ export default function UploadPanel() {
 
   return (
 
-    <section
+    <div
       className="
-        rounded-[28px]
-        border
-        border-white/80
-        bg-white/85
-        p-5
-        shadow-xl
-        backdrop-blur
+        w-full
+        text-center
       "
     >
 
+      {/* TÍTULO */}
+
       <h2
         className="
-          text-center
-          text-xl
+          font-title
+          text-[1.65rem]
           font-semibold
-          text-[#543550]
+          leading-tight
+          text-[#5f435a]
+
+          sm:text-[1.85rem]
         "
       >
-
         Comparte este momento conmigo
-
       </h2>
 
+
+      {/* SUBTÍTULO */}
 
       <p
         className="
           mt-2
-          text-center
           text-sm
-          text-[#745c70]
+          leading-6
+          text-[#80677b]
         "
       >
-
         Toma una foto o elige hasta
         {" "}
-        {
-          eventConfig
-            .maxFilesPerSelection
-        }
+        {eventConfig.maxFilesPerSelection}
         {" "}
         de tu galería.
-
       </p>
 
+
+      {/* INPUT CÁMARA */}
+
+      <input
+        ref={
+          cameraInputRef
+        }
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={
+          (
+            event
+          ) =>
+            void handleFiles(
+              event.target.files
+            )
+        }
+      />
+
+
+      {/* INPUT GALERÍA */}
+
+      <input
+        ref={
+          galleryInputRef
+        }
+        type="file"
+        accept="image/*,.heic,.heif"
+        multiple
+        className="hidden"
+        onChange={
+          (
+            event
+          ) =>
+            void handleFiles(
+              event.target.files
+            )
+        }
+      />
+
+
+      {/* BOTONES */}
 
       <div
         className="
@@ -299,12 +308,12 @@ export default function UploadPanel() {
 
         <button
           type="button"
-          disabled={busy}
+          disabled={
+            working
+          }
           onClick={
             () =>
-              cameraRef
-                .current
-                ?.click()
+              cameraInputRef.current?.click()
           }
           className="
             flex
@@ -313,18 +322,27 @@ export default function UploadPanel() {
             justify-center
             gap-2
             rounded-2xl
-            bg-[#785078]
+            bg-[#765071]
             px-4
-            py-3
             font-semibold
             text-white
-            shadow
-            disabled:opacity-50
+            shadow-[0_8px_20px_rgba(118,80,113,0.22)]
+            transition-all
+            duration-200
+
+            hover:scale-[1.03]
+            hover:bg-[#5f3e5b]
+
+            active:scale-[0.98]
+
+            disabled:cursor-not-allowed
+            disabled:opacity-55
+            disabled:hover:scale-100
           "
         >
 
           <Camera
-            size={20}
+            size={21}
           />
 
           Tomar foto
@@ -334,12 +352,12 @@ export default function UploadPanel() {
 
         <button
           type="button"
-          disabled={busy}
+          disabled={
+            working
+          }
           onClick={
             () =>
-              galleryRef
-                .current
-                ?.click()
+              galleryInputRef.current?.click()
           }
           className="
             flex
@@ -348,18 +366,27 @@ export default function UploadPanel() {
             justify-center
             gap-2
             rounded-2xl
-            bg-[#c08a9e]
+            bg-[#c28ba2]
             px-4
-            py-3
             font-semibold
             text-white
-            shadow
-            disabled:opacity-50
+            shadow-[0_8px_20px_rgba(194,139,162,0.20)]
+            transition-all
+            duration-200
+
+            hover:scale-[1.03]
+            hover:bg-[#ad748d]
+
+            active:scale-[0.98]
+
+            disabled:cursor-not-allowed
+            disabled:opacity-55
+            disabled:hover:scale-100
           "
         >
 
           <Images
-            size={20}
+            size={21}
           />
 
           Galería
@@ -369,83 +396,30 @@ export default function UploadPanel() {
       </div>
 
 
-      <input
-        ref={cameraRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={selected}
-      />
-
-
-      <input
-        ref={galleryRef}
-        type="file"
-        accept="image/*,.heic,.heif"
-        multiple
-        className="hidden"
-        onChange={selected}
-      />
-
+      {/* ESTADO */}
 
       {
         status && (
 
-          <div
+          <p
             className="
               mt-4
               rounded-2xl
-              bg-[#fff8f5]
-              p-3
-              text-sm
-              text-[#6f5668]
+              bg-white/45
+              px-3
+              py-2
+              text-xs
+              leading-5
+              text-[#765f72]
             "
           >
-
-            {
-              !navigator.onLine && (
-
-                <CloudOff
-                  size={17}
-                />
-
-              )
-            }
-
-
-            <p>
-              {status}
-            </p>
-
-
-            {
-              pending > 0 && (
-
-                <p
-                  className="
-                    mt-1
-                    font-semibold
-                  "
-                >
-
-                  {
-                    pending
-                  }
-                  {" "}
-                  fotografía(s) pendiente(s)
-
-                </p>
-
-              )
-            }
-
-          </div>
+            {status}
+          </p>
 
         )
       }
 
-    </section>
+    </div>
 
   );
 

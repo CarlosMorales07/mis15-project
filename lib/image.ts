@@ -1,12 +1,40 @@
-"use client";
-
 import imageCompression
   from "browser-image-compression";
 
 
-function isHeic(
+/*
+ * =========================================================
+ * CONFIGURACIÓN
+ * =========================================================
+ */
+
+const MAX_ORIGINAL_SIZE_MB =
+  30;
+
+
+const MAX_COMPRESSED_SIZE_MB =
+  0.55;
+
+
+const MAX_DIMENSION =
+  1920;
+
+
+/*
+ * =========================================================
+ * DETECTAR HEIC / HEIF
+ * =========================================================
+ */
+
+
+function isHeicFile(
   file: File
 ) {
+
+  const type =
+    file.type
+      .toLowerCase();
+
 
   const name =
     file.name
@@ -15,10 +43,10 @@ function isHeic(
 
   return (
 
-    file.type ===
+    type ===
       "image/heic" ||
 
-    file.type ===
+    type ===
       "image/heif" ||
 
     name.endsWith(
@@ -34,24 +62,25 @@ function isHeic(
 }
 
 
+/*
+ * =========================================================
+ * CONVERTIR HEIC → JPEG
+ * =========================================================
+ */
 
-async function convertHeic(
+
+async function convertHeicToJpeg(
   file: File
-) {
+): Promise<File> {
 
-  if (!isHeic(file)) {
-
-    return file;
-
-  }
+  const heic2anyModule =
+    await import(
+      "heic2any"
+    );
 
 
   const heic2any =
-    (
-      await import(
-        "heic2any"
-      )
-    ).default;
+    heic2anyModule.default;
 
 
   const result =
@@ -69,28 +98,53 @@ async function convertHeic(
     });
 
 
-  const blob =
-    Array.isArray(result)
+  /*
+   * heic2any puede devolver
+   * Blob o Blob[].
+   */
+
+  const convertedBlob =
+    Array.isArray(
+      result
+    )
+
       ? result[0]
+
       : result;
+
+
+  if (
+    !convertedBlob
+  ) {
+
+    throw new Error(
+      "No se pudo convertir la fotografía HEIC."
+    );
+
+  }
+
+
+  const originalName =
+    file.name.replace(
+      /\.(heic|heif)$/i,
+      ""
+    );
 
 
   return new File(
 
     [
-      blob
+      convertedBlob
     ],
 
-    `${crypto.randomUUID()}.jpg`,
+    `${originalName}.jpg`,
 
     {
-
       type:
         "image/jpeg",
 
       lastModified:
         Date.now()
-
     }
 
   );
@@ -98,59 +152,128 @@ async function convertHeic(
 }
 
 
+/*
+ * =========================================================
+ * PREPARAR IMAGEN
+ * =========================================================
+ *
+ * Esta es la función que utiliza UploadPanel.tsx
+ *
+ * Flujo:
+ *
+ * Foto original
+ * ↓
+ * validar tamaño
+ * ↓
+ * HEIC → JPEG si hace falta
+ * ↓
+ * comprimir
+ * ↓
+ * máximo 1920 px
+ * ↓
+ * aproximadamente 550 KB
+ * ↓
+ * eliminar EXIF
+ * ↓
+ * devolver File listo para subir
+ */
 
-export async function preparePhoto(
-  original: File
-) {
+
+export async function prepareImage(
+  originalFile: File
+): Promise<File> {
+
+  /*
+   * =====================================================
+   * 1. VALIDAR QUE SEA IMAGEN
+   * =====================================================
+   */
 
   if (
-    !original.type
+    !originalFile.type
       .startsWith(
         "image/"
       ) &&
-
-    !isHeic(
-      original
+    !isHeicFile(
+      originalFile
     )
   ) {
 
     throw new Error(
-      "El archivo no es una imagen."
+      "El archivo seleccionado no es una imagen válida."
     );
 
   }
+
+
+  /*
+   * =====================================================
+   * 2. VALIDAR TAMAÑO ORIGINAL
+   * =====================================================
+   */
+
+  const originalSizeMb =
+    originalFile.size /
+    (
+      1024 *
+      1024
+    );
 
 
   if (
-    original.size >
-    30 * 1024 * 1024
+    originalSizeMb >
+    MAX_ORIGINAL_SIZE_MB
   ) {
 
     throw new Error(
-      "La imagen supera 30 MB."
+      `La fotografía supera el límite de ${MAX_ORIGINAL_SIZE_MB} MB.`
     );
 
   }
 
 
-  const normalized =
-    await convertHeic(
-      original
-    );
+  /*
+   * =====================================================
+   * 3. CONVERTIR HEIC
+   * =====================================================
+   */
+
+  let workingFile =
+    originalFile;
 
 
-  const compressed =
+  if (
+    isHeicFile(
+      originalFile
+    )
+  ) {
+
+    workingFile =
+      await convertHeicToJpeg(
+        originalFile
+      );
+
+  }
+
+
+  /*
+   * =====================================================
+   * 4. COMPRIMIR
+   * =====================================================
+   */
+
+  const compressedBlob =
     await imageCompression(
 
-      normalized,
+      workingFile,
 
       {
 
         maxSizeMB:
-          0.55,
+          MAX_COMPRESSED_SIZE_MB,
 
         maxWidthOrHeight:
-          1920,
+          MAX_DIMENSION,
 
         useWebWorker:
           true,
@@ -169,24 +292,47 @@ export async function preparePhoto(
     );
 
 
-  return new File(
+  /*
+   * =====================================================
+   * 5. CREAR NOMBRE FINAL
+   * =====================================================
+   */
 
-    [
-      compressed
-    ],
+  const nameWithoutExtension =
+    workingFile.name.replace(
+      /\.[^.]+$/,
+      ""
+    );
 
-    `${crypto.randomUUID()}.jpg`,
 
-    {
+  /*
+   * browser-image-compression normalmente
+   * devuelve File, pero construimos uno nuevo
+   * para garantizar nombre y MIME.
+   */
 
-      type:
-        "image/jpeg",
+  const finalFile =
+    new File(
 
-      lastModified:
-        Date.now()
+      [
+        compressedBlob
+      ],
 
-    }
+      `${nameWithoutExtension}.jpg`,
 
-  );
+      {
+
+        type:
+          "image/jpeg",
+
+        lastModified:
+          Date.now()
+
+      }
+
+    );
+
+
+  return finalFile;
 
 }

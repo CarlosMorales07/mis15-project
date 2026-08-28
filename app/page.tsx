@@ -21,7 +21,7 @@ import {
 } from "@/lib/event-config";
 
 
-export default function WelcomePage() {
+export default function HomePage() {
 
   const [
     ready,
@@ -30,24 +30,74 @@ export default function WelcomePage() {
     useState(false);
 
 
+  const [
+    authError,
+    setAuthError
+  ] =
+    useState(false);
+
+
   useEffect(
     () => {
 
-      ensureAnonymousSession()
+      let active =
+        true;
 
-        .then(
-          () =>
-            setReady(true)
-        )
 
-        .catch(
-          console.error
-        );
+      async function prepareSession() {
+
+        try {
+
+          await ensureAnonymousSession();
+
+
+          if (
+            active
+          ) {
+
+            setReady(
+              true
+            );
+
+          }
+
+        } catch (
+          error
+        ) {
+
+          console.error(
+            "Error preparando sesión:",
+            error
+          );
+
+
+          if (
+            active
+          ) {
+
+            setAuthError(
+              true
+            );
+
+          }
+
+        }
+
+      }
+
+
+      void prepareSession();
+
+
+      return () => {
+
+        active =
+          false;
+
+      };
 
     },
-
     []
-
   );
 
 
@@ -58,198 +108,325 @@ export default function WelcomePage() {
         relative
         flex
         min-h-screen
+        min-h-[100dvh]
         items-center
         justify-center
-        overflow-hidden
-        px-5
-        py-10
+        px-4
+        py-8
+
+        sm:px-6
+        lg:px-8
       "
     >
 
-      <div
-        className="
-          absolute
-          -left-12
-          top-0
-          h-52
-          w-52
-          rounded-full
-          bg-pink-200/30
-          blur-3xl
-        "
-      />
-
-
-      <div
-        className="
-          absolute
-          -right-8
-          top-24
-          h-64
-          w-64
-          rounded-full
-          bg-purple-200/30
-          blur-3xl
-        "
-      />
-
-
       <section
         className="
+          event-glass
           relative
-          z-10
           w-full
-          max-w-xl
-          rounded-[36px]
-          border
-          border-white/80
-          bg-white/70
-          p-7
+          max-w-[640px]
+          overflow-hidden
+          rounded-[32px]
+          px-6
+          py-9
           text-center
-          shadow-2xl
-          backdrop-blur-md
-          sm:p-10
+
+          sm:px-10
+          sm:py-11
+
+          lg:max-w-[650px]
+          lg:px-14
+          lg:py-12
         "
       >
 
-        <Sparkles
-          className="
-            mx-auto
-            text-[#bd8a41]
-          "
-          size={32}
-        />
-
-
-        <p
-          className="
-            mt-5
-            text-sm
-            font-semibold
-            tracking-[0.32em]
-            text-[#a17035]
-          "
-        >
-
-          MIS 15 AÑOS
-
-        </p>
-
-
-        <h1
-          className="
-            mt-3
-            text-6xl
-            font-light
-            italic
-            tracking-tight
-            text-[#765071]
-            sm:text-7xl
-          "
-        >
-
-          {
-            eventConfig.name
-          }
-
-        </h1>
-
-
-        <p
-          className="
-            mt-4
-            text-sm
-            tracking-[0.2em]
-            text-[#8c6c7e]
-          "
-        >
-
-          {
-            eventConfig.dateLabel
-          }
-
-        </p>
-
+        {/* BRILLO */}
 
         <div
           className="
-            mx-auto
-            my-7
-            h-px
-            w-28
-            bg-gradient-to-r
-            from-transparent
-            via-[#bd8a41]
-            to-transparent
+            pointer-events-none
+            absolute
+            left-1/2
+            top-0
+            h-32
+            w-72
+            -translate-x-1/2
+            rounded-full
+            bg-[#f6e3eb]/60
+            blur-3xl
           "
+          aria-hidden="true"
         />
 
 
-        <p
+        {/* DESTELLO */}
+
+        <div
           className="
+            relative
             mx-auto
-            max-w-md
-            text-lg
-            leading-8
-            text-[#684e62]
+            flex
+            h-11
+            w-11
+            items-center
+            justify-center
+            text-[#b38136]
           "
         >
 
-          Gracias por acompañarme
-          en una noche tan especial.
+          <Sparkles
+            size={31}
+            strokeWidth={1.6}
+          />
 
+        </div>
+
+
+        {/* MIS 15 AÑOS */}
+
+        <p
+          className="
+            font-title
+            relative
+            mt-2
+            text-[1rem]
+            font-semibold
+            uppercase
+            tracking-[0.30em]
+            text-[#a66f2c]
+
+            sm:text-[1.1rem]
+          "
+        >
+          Mis 15 Años
         </p>
 
 
-        <Link
-          href="/recuerdos"
-          aria-disabled={
-            !ready
-          }
-          className={`
-            mt-8
-            inline-flex
-            min-h-14
+        {/* FERNANDA */}
+
+        <h1
+          className="
+            font-script
+            relative
+            mt-2
+            text-[4.8rem]
+            font-normal
+            leading-[0.90]
+            text-[#765071]
+
+            sm:text-[6rem]
+
+            lg:text-[6.6rem]
+          "
+        >
+          {eventConfig.name}
+        </h1>
+
+
+        {/* FECHA */}
+
+        <p
+          className="
+            relative
+            mt-5
+            text-[0.72rem]
+            font-medium
+            tracking-[0.22em]
+            text-[#9b7487]
+
+            sm:text-sm
+          "
+        >
+          {eventConfig.dateLabel}
+        </p>
+
+
+        {/* DIVISOR */}
+
+        <div
+          className="
+            relative
+            mx-auto
+            mt-7
+            flex
             items-center
             justify-center
-            rounded-full
-            px-8
-            font-semibold
-            text-white
-            shadow-lg
-
-            ${
-              ready
-
-                ? "bg-[#765071]"
-
-                : "pointer-events-none bg-[#b7a8b4]"
-            }
-          `}
+            gap-3
+          "
         >
 
-          Entrar ✨
+          <span
+            className="
+              h-px
+              w-16
+              bg-gradient-to-r
+              from-transparent
+              to-[#d4aa67]
+            "
+          />
 
-        </Link>
+
+          <Sparkles
+            size={15}
+            className="
+              text-[#c18e43]
+            "
+          />
 
 
-        {
-          !ready && (
+          <span
+            className="
+              h-px
+              w-16
+              bg-gradient-to-l
+              from-transparent
+              to-[#d4aa67]
+            "
+          />
 
-            <p
-              className="
-                mt-3
-                text-xs
-                text-[#8c7386]
-              "
-            >
+        </div>
 
-              Preparando tu experiencia…
 
-            </p>
+        {/* MENSAJE */}
 
-          )
-        }
+        <p
+          className="
+            relative
+            mx-auto
+            mt-7
+            max-w-lg
+            text-sm
+            leading-7
+            text-[#6d5368]
+
+            sm:text-base
+          "
+        >
+          Gracias por acompañarme en una noche tan especial.
+        </p>
+
+
+        {/* BOTÓN */}
+
+        <div
+          className="
+            relative
+            mt-7
+          "
+        >
+
+          {
+            ready
+
+              ? (
+
+                <Link
+                  href="/recuerdos"
+                  className="
+                    group
+                    inline-flex
+                    min-h-12
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-full
+                    bg-[#765071]
+                    px-8
+                    font-semibold
+                    text-white
+                    shadow-[0_10px_25px_rgba(118,80,113,0.28)]
+                    transition-all
+                    duration-200
+
+                    hover:scale-105
+                    hover:bg-[#5f3e5b]
+
+                    active:scale-[0.98]
+                  "
+                >
+
+                  Entrar
+
+                  <Sparkles
+                    size={17}
+                    className="
+                      transition-transform
+                      duration-200
+                      group-hover:rotate-12
+                      group-hover:scale-110
+                    "
+                  />
+
+                </Link>
+
+              )
+
+              : authError
+
+                ? (
+
+                  <button
+                    type="button"
+                    onClick={
+                      () =>
+                        window.location.reload()
+                    }
+                    className="
+                      min-h-12
+                      rounded-full
+                      bg-[#765071]
+                      px-8
+                      font-semibold
+                      text-white
+                      shadow-lg
+                      transition-all
+                      hover:scale-105
+                      hover:bg-[#5f3e5b]
+                    "
+                  >
+                    Intentar nuevamente
+                  </button>
+
+                )
+
+                : (
+
+                  <button
+                    type="button"
+                    disabled
+                    className="
+                      inline-flex
+                      min-h-12
+                      items-center
+                      gap-2
+                      rounded-full
+                      bg-[#765071]/70
+                      px-8
+                      font-semibold
+                      text-white
+                    "
+                  >
+
+                    <span
+                      className="
+                        h-4
+                        w-4
+                        animate-spin
+                        rounded-full
+                        border-2
+                        border-white/40
+                        border-t-white
+                      "
+                    />
+
+                    Preparando...
+
+                  </button>
+
+                )
+          }
+
+        </div>
 
       </section>
 
