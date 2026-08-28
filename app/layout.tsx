@@ -62,6 +62,11 @@ const greatVibes =
 export const metadata:
   Metadata = {
 
+  metadataBase:
+    new URL(
+      "https://fernanda-mis15.vercel.app"
+    ),
+
   title:
     "Mis 15 Años | Fernanda",
 
@@ -71,12 +76,71 @@ export const metadata:
   manifest:
     "/manifest.webmanifest",
 
+  openGraph: {
+
+    title:
+      "Mis 15 Años | Fernanda",
+
+    description:
+      "Comparte y revive los momentos especiales de los 15 años de Fernanda.",
+
+    url:
+      "https://fernanda-mis15.vercel.app",
+
+    siteName:
+      "Mis 15 Años | Fernanda",
+
+    locale:
+      "es_EC",
+
+    type:
+      "website",
+
+    images: [
+      {
+
+        url:
+          "/design/preview-whatsapp.jpg",
+
+        width:
+          1200,
+
+        height:
+          630,
+
+        alt:
+          "Mis 15 Años de Fernanda"
+
+      }
+    ]
+
+  },
+
+  twitter: {
+
+    card:
+      "summary_large_image",
+
+    title:
+      "Mis 15 Años | Fernanda",
+
+    description:
+      "Comparte y revive los momentos especiales de los 15 años de Fernanda.",
+
+    images: [
+      "/design/preview-whatsapp.jpg"
+    ]
+
+  },
+
   robots: {
+
     index:
       false,
 
     follow:
       false
+
   }
 
 };
