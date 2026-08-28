@@ -151,6 +151,16 @@ function getThumbnailUrl(
 
 }
 
+function getViewerPreviewUrl(
+  url: string
+) {
+
+  return url.replace(
+    "/upload/",
+    "/upload/f_auto,q_auto:low,c_limit,w_700/"
+  );
+
+}
 
 function getViewerUrl(
   url: string
@@ -2648,6 +2658,11 @@ useEffect(
 
   }
 
+  /* =======================================================
+   PRECARGAR FOTO ANTERIOR Y SIGUIENTE
+   ======================================================= */
+
+
   useEffect(
   () => {
 
@@ -3905,25 +3920,35 @@ useEffect(
                   }
 
 
-                  {/* VERSIÓN LIGERA INMEDIATA */}
+{/* VERSIÓN LIGERA INMEDIATA */}
 
 <img
+  key={
+    `preview-${openPhoto.id}`
+  }
   src={
-    getThumbnailUrl(
-      openPhoto.secure_url,
-      800
+    getViewerPreviewUrl(
+      openPhoto.secure_url
     )
   }
   alt=""
   aria-hidden="true"
-  className="
+  className={`
     absolute
     inset-0
     h-full
     w-full
     select-none
     object-contain
-  "
+    transition-opacity
+    duration-300
+
+    ${
+      viewerLoading
+        ? "opacity-100"
+        : "opacity-0"
+    }
+  `}
 />
 
 
