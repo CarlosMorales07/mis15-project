@@ -27,6 +27,31 @@ import {
 } from "@/lib/uploader";
 
 
+function getErrorMessage(
+  error: unknown
+) {
+
+  if (
+    error instanceof Error
+  ) {
+
+    return error.message;
+
+  }
+
+  if (
+    typeof error === "string"
+  ) {
+
+    return error;
+
+  }
+
+  return "Error desconocido";
+
+}
+
+
 export default function UploadPanel() {
 
   const cameraInputRef =
@@ -84,74 +109,161 @@ export default function UploadPanel() {
     );
 
 
-    setStatus(
-      `Preparando ${selected.length} ${
-        selected.length === 1
-          ? "foto"
-          : "fotos"
-      }...`
-    );
-
-
     try {
 
-      let preparedCount =
-        0;
-
-
       for (
-        const file of
-        selected
+        let index = 0;
+        index < selected.length;
+        index += 1
       ) {
 
-        const prepared =
-          await prepareImage(
-            file
+        const file =
+          selected[index];
+
+
+        /*
+         * ===============================================
+         * PASO 1: PREPARAR IMAGEN
+         * ===============================================
+         */
+
+        setStatus(
+          `Preparando ${index + 1} de ${selected.length}...`
+        );
+
+
+        let prepared:
+          File;
+
+
+        try {
+
+          prepared =
+            await prepareImage(
+              file
+            );
+
+        } catch (
+          error
+        ) {
+
+          const detail =
+            getErrorMessage(
+              error
+            );
+
+
+          console.error(
+            "Error en prepareImage:",
+            error
           );
 
 
-        await queueAdd({
+          throw new Error(
+            `PREPARACIÓN: ${detail}`
+          );
 
-          id:
-            crypto.randomUUID(),
-
-          blob:
-            prepared,
-
-          filename:
-            prepared.name,
-
-          createdAt:
-            Date.now()
-
-        });
+        }
 
 
-        preparedCount +=
-          1;
-
+        /*
+         * ===============================================
+         * PASO 2: GUARDAR EN COLA
+         * ===============================================
+         */
 
         setStatus(
-          `Preparando ${preparedCount} de ${selected.length}...`
+          `Guardando ${index + 1} de ${selected.length}...`
         );
+
+
+        try {
+
+          await queueAdd({
+
+            id:
+              crypto.randomUUID(),
+
+            blob:
+              prepared,
+
+            filename:
+              prepared.name,
+
+            createdAt:
+              Date.now()
+
+          });
+
+        } catch (
+          error
+        ) {
+
+          const detail =
+            getErrorMessage(
+              error
+            );
+
+
+          console.error(
+            "Error guardando en cola:",
+            error
+          );
+
+
+          throw new Error(
+            `COLA OFFLINE: ${detail}`
+          );
+
+        }
 
       }
 
+
+      /*
+       * ===============================================
+       * PASO 3: SUBIR
+       * ===============================================
+       */
 
       if (
         navigator.onLine
       ) {
 
         setStatus(
-          "Compartiendo recuerdos..."
+          "Subiendo fotografías..."
         );
 
 
-        await processQueue();
+        try {
+
+          await processQueue();
+
+        } catch (
+          error
+        ) {
+
+          const detail =
+            getErrorMessage(
+              error
+            );
+
+
+          console.error(
+            "Error procesando cola:",
+            error
+          );
+
+
+          throw new Error(
+            `SUBIDA: ${detail}`
+          );
+
+        }
 
 
         setStatus(
-          "¡Listo! Tus recuerdos se están mostrando en la galería."
+          "¡Listo! Tus recuerdos fueron compartidos."
         );
 
       } else {
@@ -167,14 +279,20 @@ export default function UploadPanel() {
       error
     ) {
 
+      const detail =
+        getErrorMessage(
+          error
+        );
+
+
       console.error(
-        "Error preparando fotografías:",
+        "Error en flujo de fotografías:",
         error
       );
 
 
       setStatus(
-        "No pudimos preparar una de las fotografías. Inténtalo nuevamente."
+        `No se pudo completar el proceso. ${detail}`
       );
 
 
@@ -218,8 +336,6 @@ export default function UploadPanel() {
       "
     >
 
-      {/* TÍTULO */}
-
       <h2
         className="
           font-title
@@ -235,8 +351,6 @@ export default function UploadPanel() {
       </h2>
 
 
-      {/* SUBTÍTULO */}
-
       <p
         className="
           mt-2
@@ -245,15 +359,11 @@ export default function UploadPanel() {
           text-[#80677b]
         "
       >
-        Toma una foto o elige hasta
-        {" "}
-        {eventConfig.maxFilesPerSelection}
-        {" "}
+        Toma una foto o elige hasta{" "}
+        {eventConfig.maxFilesPerSelection}{" "}
         de tu galería.
       </p>
 
-
-      {/* INPUT CÁMARA */}
 
       <input
         ref={
@@ -274,8 +384,6 @@ export default function UploadPanel() {
       />
 
 
-      {/* INPUT GALERÍA */}
-
       <input
         ref={
           galleryInputRef
@@ -294,8 +402,6 @@ export default function UploadPanel() {
         }
       />
 
-
-      {/* BOTONES */}
 
       <div
         className="
@@ -337,7 +443,6 @@ export default function UploadPanel() {
 
             disabled:cursor-not-allowed
             disabled:opacity-55
-            disabled:hover:scale-100
           "
         >
 
@@ -381,7 +486,6 @@ export default function UploadPanel() {
 
             disabled:cursor-not-allowed
             disabled:opacity-55
-            disabled:hover:scale-100
           "
         >
 
@@ -396,8 +500,6 @@ export default function UploadPanel() {
       </div>
 
 
-      {/* ESTADO */}
-
       {
         status && (
 
@@ -405,9 +507,9 @@ export default function UploadPanel() {
             className="
               mt-4
               rounded-2xl
-              bg-white/45
-              px-3
-              py-2
+              bg-white/55
+              px-4
+              py-3
               text-xs
               leading-5
               text-[#765f72]
