@@ -156,9 +156,22 @@ function getViewerUrl(
   url: string
 ) {
 
+  const isMobile =
+    typeof window !==
+      "undefined" &&
+    window.innerWidth <
+      768;
+
+
+  const width =
+    isMobile
+      ? 1100
+      : 1800;
+
+
   return url.replace(
     "/upload/",
-    "/upload/f_auto,q_auto,c_limit,w_1800,h_1800/"
+    `/upload/f_auto,q_auto:good,c_limit,w_${width}/`
   );
 
 }
@@ -297,6 +310,42 @@ function isMobileLikeDevice() {
         "(pointer: coarse)"
       )
       .matches
+  );
+
+}
+
+function isIOSDevice() {
+
+  if (
+    typeof navigator ===
+    "undefined"
+  ) {
+
+    return false;
+
+  }
+
+
+  const userAgent =
+    navigator.userAgent;
+
+
+  const classicIOS =
+    /iPad|iPhone|iPod/i.test(
+      userAgent
+    );
+
+
+  const modernIPad =
+    navigator.platform ===
+      "MacIntel" &&
+    navigator.maxTouchPoints >
+      1;
+
+
+  return (
+    classicIOS ||
+    modernIPad
   );
 
 }
@@ -712,97 +761,135 @@ export default function Gallery() {
     );
 
 
-  useEffect(
-    () => {
+useEffect(
+  () => {
 
-      if (
-        !modalIsOpen
-      ) {
+    if (
+      !modalIsOpen
+    ) {
 
-        return;
+      return;
 
-      }
-
-
-      const scrollY =
-        window.scrollY;
+    }
 
 
-      const body =
-        document.body;
+    const scrollY =
+      window.scrollY;
 
 
-      const previousPosition =
-        body.style.position;
+    const body =
+      document.body;
 
-      const previousTop =
-        body.style.top;
 
-      const previousLeft =
-        body.style.left;
+    const html =
+      document.documentElement;
 
-      const previousRight =
-        body.style.right;
 
-      const previousWidth =
-        body.style.width;
+    const previousPosition =
+      body.style.position;
 
-      const previousOverflow =
-        body.style.overflow;
+    const previousTop =
+      body.style.top;
+
+    const previousLeft =
+      body.style.left;
+
+    const previousRight =
+      body.style.right;
+
+    const previousWidth =
+      body.style.width;
+
+    const previousOverflow =
+      body.style.overflow;
+
+    const previousHtmlOverflow =
+      html.style.overflow;
+
+    const previousScrollBehavior =
+      html.style.scrollBehavior;
+
+
+    body.style.position =
+      "fixed";
+
+    body.style.top =
+      `-${scrollY}px`;
+
+    body.style.left =
+      "0";
+
+    body.style.right =
+      "0";
+
+    body.style.width =
+      "100%";
+
+    body.style.overflow =
+      "hidden";
+
+
+    html.style.overflow =
+      "hidden";
+
+
+    return () => {
+
+      /*
+       * Impedir que scroll-behavior:smooth
+       * anime la restauración.
+       */
+
+      html.style.scrollBehavior =
+        "auto";
+
+
+      html.style.overflow =
+        previousHtmlOverflow;
 
 
       body.style.position =
-        "fixed";
+        previousPosition;
 
       body.style.top =
-        `-${scrollY}px`;
+        previousTop;
 
       body.style.left =
-        "0";
+        previousLeft;
 
       body.style.right =
-        "0";
+        previousRight;
 
       body.style.width =
-        "100%";
+        previousWidth;
 
       body.style.overflow =
-        "hidden";
+        previousOverflow;
 
 
-      return () => {
-
-        body.style.position =
-          previousPosition;
-
-        body.style.top =
-          previousTop;
-
-        body.style.left =
-          previousLeft;
-
-        body.style.right =
-          previousRight;
-
-        body.style.width =
-          previousWidth;
-
-        body.style.overflow =
-          previousOverflow;
+      window.scrollTo(
+        0,
+        scrollY
+      );
 
 
-        window.scrollTo(
-          0,
-          scrollY
-        );
+      window.requestAnimationFrame(
+        () => {
 
-      };
+          html.style.scrollBehavior =
+            previousScrollBehavior;
 
-    },
-    [
-      modalIsOpen
-    ]
-  );
+        }
+      );
+
+    };
+
+  },
+
+  [
+    modalIsOpen
+  ]
+);
 
 
   /* =======================================================
@@ -2090,144 +2177,173 @@ export default function Gallery() {
 
   async function confirmBulkDownload() {
 
-    const targetPhotos =
-      [
-        ...pendingDownloadPhotos
-      ];
+  const targetPhotos =
+    [
+      ...pendingDownloadPhotos
+    ];
 
 
-    if (
-      targetPhotos.length ===
-      0
-    ) {
-
-      setDownloadStatus(
-        "idle"
-      );
-
-
-      return;
-
-    }
-
-
-    cancelDownloadRef.current =
-      false;
-
-
-    setDownloadCurrent(
-      0
-    );
-
-
-    setDownloadTotal(
-      targetPhotos.length
-    );
-
-
-    setDownloadError(
-      ""
-    );
-
+  if (
+    targetPhotos.length ===
+    0
+  ) {
 
     setDownloadStatus(
-      "running"
+      "idle"
     );
 
 
-    let downloaded =
-      0;
+    return;
+
+  }
 
 
-    const mobile =
-      isMobileLikeDevice();
+  cancelDownloadRef.current =
+    false;
 
+
+  setDownloadCurrent(
+    0
+  );
+
+
+  setDownloadTotal(
+    targetPhotos.length
+  );
+
+
+  setDownloadError(
+    ""
+  );
+
+
+  setDownloadStatus(
+    "running"
+  );
+
+
+  /*
+   * =====================================================
+   * IPHONE / IPAD
+   * =====================================================
+   *
+   * En iOS evitamos múltiples descargas del navegador.
+   *
+   * Preparamos todas las imágenes y abrimos UNA VEZ
+   * el menú nativo del sistema.
+   */
+
+  if (
+    isIOSDevice() &&
+    typeof navigator.share ===
+      "function" &&
+    typeof navigator.canShare ===
+      "function"
+  ) {
 
     try {
 
+      const files:
+        File[] = [];
+
+
       for (
-        let batchStart = 0;
-        batchStart <
+        let index = 0;
+        index <
           targetPhotos.length;
-        batchStart +=
-          DOWNLOAD_BATCH_SIZE
+        index += 1
       ) {
 
         if (
           cancelDownloadRef.current
         ) {
 
-          break;
+          setDownloadStatus(
+            "cancelled"
+          );
+
+
+          return;
 
         }
 
 
-        const batch =
-          targetPhotos.slice(
-            batchStart,
-            batchStart +
-              DOWNLOAD_BATCH_SIZE
+        const file =
+          await photoToFile(
+            targetPhotos[index]
           );
 
 
-        for (
-          const photo of
-          batch
-        ) {
-
-          if (
-            cancelDownloadRef.current
-          ) {
-
-            break;
-
-          }
+        files.push(
+          file
+        );
 
 
-          /*
-           * photoToFile ya incluye
-           * reintentos ante Load failed.
-           */
-
-          const file =
-            await photoToFile(
-              photo
-            );
-
-
-          downloadBlob(
-            file,
-            file.name
-          );
-
-
-          downloaded +=
-            1;
-
-
-          setDownloadCurrent(
-            downloaded
-          );
-
-
-          /*
-           * Safari necesita más espacio
-           * entre descargas automáticas.
-           */
-
-          await delay(
-            mobile
-              ? 1100
-              : 300
-          );
-
-        }
+        setDownloadCurrent(
+          index +
+          1
+        );
 
       }
 
 
+      const canShareFiles =
+        navigator.canShare({
+          files
+        });
+
+
       if (
-        cancelDownloadRef.current
+        !canShareFiles
+      ) {
+
+        throw new Error(
+          "El dispositivo no permite compartir este conjunto de fotografías."
+        );
+
+      }
+
+
+      /*
+       * IMPORTANTE:
+       *
+       * Esta es una sola interacción nativa.
+       *
+       * En iPhone aparecerá el menú donde
+       * puede elegirse Guardar imágenes.
+       */
+
+      await navigator.share({
+
+        files,
+
+        title:
+          "Recuerdos de los 15 de Fernanda"
+
+      });
+
+
+      setDownloadStatus(
+        "completed"
+      );
+
+
+      return;
+
+
+    } catch (
+      error
+    ) {
+
+      /*
+       * El usuario cerró voluntariamente
+       * el menú de compartir.
+       */
+
+      if (
+        error instanceof DOMException &&
+        error.name ===
+          "AbortError"
       ) {
 
         setDownloadStatus(
@@ -2240,25 +2356,14 @@ export default function Gallery() {
       }
 
 
-      setDownloadStatus(
-        "completed"
-      );
-
-
-    } catch (
-      error
-    ) {
-
       console.error(
-        "Error descargando fotografías:",
+        "Error compartiendo fotografías en iOS:",
         error
       );
 
 
       setDownloadError(
-        error instanceof Error
-          ? error.message
-          : "No se pudieron descargar todas las fotografías."
+        "No fue posible preparar todas las fotografías para guardarlas."
       );
 
 
@@ -2266,9 +2371,138 @@ export default function Gallery() {
         "error"
       );
 
+
+      return;
+
     }
 
   }
+
+
+  /*
+   * =====================================================
+   * PC / OTROS DISPOSITIVOS
+   * =====================================================
+   */
+
+  let downloaded =
+    0;
+
+
+  try {
+
+    for (
+      let batchStart = 0;
+      batchStart <
+        targetPhotos.length;
+      batchStart +=
+        DOWNLOAD_BATCH_SIZE
+    ) {
+
+      if (
+        cancelDownloadRef.current
+      ) {
+
+        break;
+
+      }
+
+
+      const batch =
+        targetPhotos.slice(
+          batchStart,
+          batchStart +
+            DOWNLOAD_BATCH_SIZE
+        );
+
+
+      for (
+        const photo of
+        batch
+      ) {
+
+        if (
+          cancelDownloadRef.current
+        ) {
+
+          break;
+
+        }
+
+
+        const file =
+          await photoToFile(
+            photo
+          );
+
+
+        downloadBlob(
+          file,
+          file.name
+        );
+
+
+        downloaded +=
+          1;
+
+
+        setDownloadCurrent(
+          downloaded
+        );
+
+
+        await delay(
+          300
+        );
+
+      }
+
+    }
+
+
+    if (
+      cancelDownloadRef.current
+    ) {
+
+      setDownloadStatus(
+        "cancelled"
+      );
+
+
+      return;
+
+    }
+
+
+    setDownloadStatus(
+      "completed"
+    );
+
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      "Error descargando fotografías:",
+      error
+    );
+
+
+    setDownloadError(
+      error instanceof Error
+        ? error.message
+        : "No se pudieron descargar todas las fotografías."
+    );
+
+
+    setDownloadStatus(
+      "error"
+    );
+
+  }
+
+}
 
 
   function cancelBulkDownload() {
@@ -2414,6 +2648,89 @@ export default function Gallery() {
 
   }
 
+  useEffect(
+  () => {
+
+    if (
+      !openPhoto ||
+      visiblePhotos.length <=
+        1
+    ) {
+
+      return;
+
+    }
+
+
+    const previousIndex =
+      currentPhotoIndex <=
+        0
+        ? visiblePhotos.length -
+          1
+        : currentPhotoIndex -
+          1;
+
+
+    const nextIndex =
+      currentPhotoIndex >=
+        visiblePhotos.length -
+          1
+        ? 0
+        : currentPhotoIndex +
+          1;
+
+
+    const previousPhoto =
+      visiblePhotos[
+        previousIndex
+      ];
+
+
+    const nextPhoto =
+      visiblePhotos[
+        nextIndex
+      ];
+
+
+    if (
+      previousPhoto
+    ) {
+
+      const previousImage =
+        new Image();
+
+
+      previousImage.src =
+        getViewerUrl(
+          previousPhoto.secure_url
+        );
+
+    }
+
+
+    if (
+      nextPhoto
+    ) {
+
+      const nextImage =
+        new Image();
+
+
+      nextImage.src =
+        getViewerUrl(
+          nextPhoto.secure_url
+        );
+
+    }
+
+  },
+
+  [
+    openPhoto?.id,
+    currentPhotoIndex,
+    visiblePhotos
+  ]
+);
 
   /* =======================================================
      TECLADO
@@ -3565,52 +3882,6 @@ export default function Gallery() {
                   "
                 >
 
-                  {
-                    viewerLoading && (
-
-                      <div
-                        className="
-                          absolute
-                          inset-0
-                          z-10
-                          flex
-                          items-center
-                          justify-center
-                        "
-                      >
-
-                        <div
-                          className="
-                            flex
-                            flex-col
-                            items-center
-                            gap-3
-                            text-white
-                          "
-                        >
-
-                          <LoaderCircle
-                            size={36}
-                            className="
-                              animate-spin
-                            "
-                          />
-
-                          <span
-                            className="
-                              text-sm
-                            "
-                          >
-                            Cargando fotografía...
-                          </span>
-
-                        </div>
-
-                      </div>
-
-                    )
-                  }
-
 
                   {
                     viewerError && (
@@ -3634,49 +3905,83 @@ export default function Gallery() {
                   }
 
 
-                  <img
-                    key={
-                      openPhoto.id
-                    }
-                    src={
-                      getViewerUrl(
-                        openPhoto.secure_url
-                      )
-                    }
-                    alt="Recuerdo ampliado"
-                    onLoad={
-                      () => {
+                  {/* VERSIÓN LIGERA INMEDIATA */}
 
-                        setViewerLoading(
-                          false
-                        );
+<img
+  src={
+    getThumbnailUrl(
+      openPhoto.secure_url,
+      800
+    )
+  }
+  alt=""
+  aria-hidden="true"
+  className="
+    absolute
+    inset-0
+    h-full
+    w-full
+    select-none
+    object-contain
+  "
+/>
 
-                        setViewerError(
-                          false
-                        );
 
-                      }
-                    }
-                    onError={
-                      () => {
+{/* VERSIÓN DE ALTA CALIDAD */}
 
-                        setViewerLoading(
-                          false
-                        );
+<img
+  key={
+    openPhoto.id
+  }
+  src={
+    getViewerUrl(
+      openPhoto.secure_url
+    )
+  }
+  alt="Recuerdo ampliado"
+  onLoad={
+    () => {
 
-                        setViewerError(
-                          true
-                        );
+      setViewerLoading(
+        false
+      );
 
-                      }
-                    }
-                    className="
-                      h-full
-                      w-full
-                      select-none
-                      object-contain
-                    "
-                  />
+      setViewerError(
+        false
+      );
+
+    }
+  }
+  onError={
+    () => {
+
+      setViewerLoading(
+        false
+      );
+
+      setViewerError(
+        true
+      );
+
+    }
+  }
+  className={`
+    absolute
+    inset-0
+    h-full
+    w-full
+    select-none
+    object-contain
+    transition-opacity
+    duration-300
+
+    ${
+      viewerLoading
+        ? "opacity-0"
+        : "opacity-100"
+    }
+  `}
+/>
 
 
                   {
