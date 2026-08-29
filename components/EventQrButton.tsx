@@ -37,6 +37,12 @@ export default function EventQrButton() {
     useState(false);
 
 
+  /*
+   * =====================================================
+   * BLOQUEAR SCROLL
+   * =====================================================
+   */
+
   useEffect(
     () => {
 
@@ -61,6 +67,10 @@ export default function EventQrButton() {
         document.documentElement;
 
 
+      const previousBehavior =
+        html.style.scrollBehavior;
+
+
       body.style.position =
         "fixed";
 
@@ -82,10 +92,6 @@ export default function EventQrButton() {
 
 
       return () => {
-
-        const previousBehavior =
-          html.style.scrollBehavior;
-
 
         html.style.scrollBehavior =
           "auto";
@@ -135,6 +141,12 @@ export default function EventQrButton() {
   );
 
 
+  /*
+   * =====================================================
+   * COMPARTIR
+   * =====================================================
+   */
+
   async function shareAccess() {
 
     try {
@@ -150,7 +162,7 @@ export default function EventQrButton() {
             "Mis 15 Años | Fernanda",
 
           text:
-            "Comparte tus fotos de los 15 años de Fernanda.",
+            "Comparte tus fotos y recuerdos de los 15 años de Fernanda.",
 
           url:
             EVENT_URL
@@ -174,10 +186,13 @@ export default function EventQrButton() {
 
 
       window.setTimeout(
-        () =>
+        () => {
+
           setCopied(
             false
-          ),
+          );
+
+        },
         2500
       );
 
@@ -198,7 +213,7 @@ export default function EventQrButton() {
 
 
       console.error(
-        "No se pudo compartir el enlace:",
+        "No se pudo compartir:",
         error
       );
 
@@ -211,6 +226,10 @@ export default function EventQrButton() {
 
     <>
 
+      {/* =================================================
+          BOTÓN DISCRETO
+      ================================================== */}
+
       <button
         type="button"
         onClick={
@@ -220,35 +239,49 @@ export default function EventQrButton() {
             )
         }
         className="
+          group
           inline-flex
-          min-h-10
+          min-h-11
           items-center
           justify-center
           gap-2
           rounded-full
           border
-          border-[#d8c2d5]
+          border-[#d5bdce]
           bg-white/55
-          px-4
-          text-xs
+          px-5
+          text-sm
           font-semibold
           text-[#765071]
           shadow-sm
-          backdrop-blur
+          backdrop-blur-md
           transition-all
           duration-200
+
+          hover:scale-[1.03]
           hover:bg-white/80
+
+          active:scale-[0.98]
         "
       >
 
         <QrCode
-          size={17}
+          size={18}
+          className="
+            transition-transform
+            duration-200
+            group-hover:scale-110
+          "
         />
 
         Mostrar QR
 
       </button>
 
+
+      {/* =================================================
+          MODAL
+      ================================================== */}
 
       {
         open &&
@@ -258,16 +291,18 @@ export default function EventQrButton() {
             className="
               fixed
               inset-0
-              z-[12000]
+              z-[15000]
               flex
               h-[100dvh]
               w-screen
               items-center
               justify-center
               overflow-hidden
-              bg-black/75
-              p-4
+              bg-black/80
+              p-3
               backdrop-blur-md
+
+              sm:p-6
             "
             role="dialog"
             aria-modal="true"
@@ -276,15 +311,19 @@ export default function EventQrButton() {
             <div
               className="
                 relative
+                flex
+                max-h-[calc(100dvh-24px)]
                 w-full
-                max-w-sm
-                rounded-[32px]
+                max-w-[430px]
+                flex-col
+                overflow-hidden
+                rounded-[30px]
                 bg-[#fffaf4]
-                p-6
-                text-center
                 shadow-2xl
               "
             >
+
+              {/* CERRAR */}
 
               <button
                 type="button"
@@ -294,88 +333,60 @@ export default function EventQrButton() {
                       false
                     )
                 }
+                aria-label="Cerrar código QR"
                 className="
                   absolute
-                  right-4
-                  top-4
+                  right-3
+                  top-3
+                  z-20
                   flex
-                  h-10
-                  w-10
+                  h-11
+                  w-11
                   items-center
                   justify-center
                   rounded-full
-                  bg-[#eee4f2]
-                  text-[#765071]
+                  bg-white/95
+                  text-[#684e62]
+                  shadow-lg
+                  backdrop-blur
+                  transition-all
+                  duration-200
+
+                  hover:scale-110
+                  hover:bg-[#765071]
+                  hover:text-white
                 "
               >
 
                 <X
-                  size={21}
+                  size={23}
                 />
 
               </button>
 
 
-              <p
-                className="
-                  font-title
-                  text-lg
-                  font-semibold
-                  tracking-[0.18em]
-                  text-[#ad7c3d]
-                "
-              >
-                MIS 15 AÑOS
-              </p>
-
-
-              <h2
-                className="
-                  font-script
-                  mt-1
-                  text-[3.7rem]
-                  font-normal
-                  leading-none
-                  text-[#765071]
-                "
-              >
-                Fernanda
-              </h2>
-
-
-              <p
-                className="
-                  mx-auto
-                  mt-4
-                  max-w-xs
-                  text-sm
-                  leading-6
-                  text-[#80677b]
-                "
-              >
-                Escanea el código para compartir tus fotos
-                y disfrutar los recuerdos de esta noche.
-              </p>
-
+              {/* POSTER */}
 
               <div
                 className="
-                  mx-auto
-                  mt-5
-                  w-fit
-                  rounded-[26px]
-                  bg-white
-                  p-4
-                  shadow-lg
+                  min-h-0
+                  flex-1
+                  overflow-y-auto
+                  bg-[#fffaf4]
+                  p-2
                 "
               >
 
                 <img
-                  src="/design/qr-fernanda.png"
-                  alt="Código QR para acceder a Mis 15 Años de Fernanda"
+                  src="/design/poster-qr.png"
+                  alt="Código QR para compartir los recuerdos de los 15 años de Fernanda"
                   className="
-                    h-[220px]
-                    w-[220px]
+                    mx-auto
+                    h-auto
+                    max-h-[72dvh]
+                    w-auto
+                    max-w-full
+                    rounded-[22px]
                     object-contain
                   "
                 />
@@ -383,63 +394,89 @@ export default function EventQrButton() {
               </div>
 
 
-              <p
-                className="
-                  mt-4
-                  break-all
-                  text-xs
-                  text-[#92798c]
-                "
-              >
-                fernanda-mis15.vercel.app
-              </p>
+              {/* ACCIONES */}
 
-
-              <button
-                type="button"
-                onClick={
-                  () =>
-                    void shareAccess()
-                }
+              <div
                 className="
-                  mt-5
-                  flex
-                  min-h-12
-                  w-full
-                  items-center
-                  justify-center
-                  gap-2
-                  rounded-full
-                  bg-[#765071]
-                  px-5
-                  font-semibold
-                  text-white
+                  shrink-0
+                  border-t
+                  border-[#eadfe8]
+                  bg-[#fffaf4]
+                  px-4
+                  pb-[calc(env(safe-area-inset-bottom)+16px)]
+                  pt-4
                 "
               >
 
-                {
-                  copied
-                    ? (
-                      <>
-                        <Check
-                          size={19}
-                        />
+                <p
+                  className="
+                    text-center
+                    text-xs
+                    leading-5
+                    text-[#80677b]
+                  "
+                >
+                  Muéstrale este código a otra persona
+                  para que pueda entrar y compartir sus fotos.
+                </p>
 
-                        Enlace copiado
-                      </>
-                    )
-                    : (
-                      <>
-                        <Share2
-                          size={19}
-                        />
 
-                        Compartir acceso
-                      </>
-                    )
-                }
+                <button
+                  type="button"
+                  onClick={
+                    () =>
+                      void shareAccess()
+                  }
+                  className="
+                    mt-3
+                    flex
+                    min-h-12
+                    w-full
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-full
+                    bg-[#765071]
+                    px-5
+                    font-semibold
+                    text-white
+                    shadow-md
+                    transition-all
+                    duration-200
 
-              </button>
+                    hover:bg-[#5f3e5b]
+
+                    active:scale-[0.98]
+                  "
+                >
+
+                  {
+                    copied
+
+                      ? (
+                        <>
+                          <Check
+                            size={19}
+                          />
+
+                          Enlace copiado
+                        </>
+                      )
+
+                      : (
+                        <>
+                          <Share2
+                            size={19}
+                          />
+
+                          Compartir invitación
+                        </>
+                      )
+                  }
+
+                </button>
+
+              </div>
 
             </div>
 

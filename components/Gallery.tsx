@@ -61,6 +61,12 @@ type DownloadStatus =
   | "cancelled"
   | "error";
 
+  type BulkDeleteStatus =
+  | "idle"
+  | "confirm"
+  | "running"
+  | "completed"
+  | "error";
 
 type NoticeState = {
 
@@ -767,19 +773,63 @@ export default function Gallery() {
   const cancelDownloadRef =
     useRef(false);
 
+/* =======================================================
+   ELIMINACIÓN MÚLTIPLE
+   ======================================================= */
+
+const [
+  bulkDeleteStatus,
+  setBulkDeleteStatus
+] =
+  useState<BulkDeleteStatus>(
+    "idle"
+  );
+
+
+const [
+  pendingDeletePhotos,
+  setPendingDeletePhotos
+] =
+  useState<Photo[]>(
+    []
+  );
+
+
+const [
+  bulkDeleteCurrent,
+  setBulkDeleteCurrent
+] =
+  useState(0);
+
+
+const [
+  bulkDeleteTotal,
+  setBulkDeleteTotal
+] =
+  useState(0);
+
+
+const [
+  bulkDeleteError,
+  setBulkDeleteError
+] =
+  useState("");
+
 
   /* =======================================================
      BLOQUEAR SCROLL CUANDO HAY MODAL
      ======================================================= */
 
   const modalIsOpen =
-    Boolean(
-      openPhoto ||
-      deleteCandidate ||
-      notice ||
-      downloadStatus !==
-        "idle"
-    );
+  Boolean(
+    openPhoto ||
+    deleteCandidate ||
+    notice ||
+    downloadStatus !==
+      "idle" ||
+    bulkDeleteStatus !==
+      "idle"
+  );
 
 
 useEffect(
@@ -1309,6 +1359,11 @@ useEffect(
         onlineHandler
       );
 
+      window.addEventListener(
+  "offline",
+  offlineHandler
+);
+
 
       document.addEventListener(
         "visibilitychange",
@@ -1333,6 +1388,11 @@ useEffect(
           "online",
           onlineHandler
         );
+
+        window.removeEventListener(
+  "offline",
+  offlineHandler
+);
 
 
         document.removeEventListener(
@@ -2168,6 +2228,487 @@ useEffect(
       ]
     );
 
+    const selectedOwnPhotos =
+  useMemo(
+
+    () =>
+      selectedPhotos.filter(
+        (
+          photo
+        ) =>
+          photo.owner_id ===
+          userId
+      ),
+
+    [
+      selectedPhotos,
+      userId
+    ]
+
+  );
+
+
+const selectedContainsForeignPhotos =
+  selectedPhotos.some(
+    (
+      photo
+    ) =>
+      photo.owner_id !==
+      userId
+  );
+
+
+const canDeleteSelected =
+  selectedPhotos.length >
+    0 &&
+  !selectedContainsForeignPhotos;
+
+/* =======================================================
+   ELIMINACIÓN MÚLTIPLE
+   ======================================================= */
+
+function requestBulkDelete() {
+
+  if (
+    selectedPhotos.length ===
+    0
+  ) {
+
+    return;
+
+  }
+
+
+  /*
+   * Seguridad adicional.
+   * Aunque el botón esté deshabilitado,
+   * verificamos otra vez aquí.
+   */
+
+  if (
+    selectedContainsForeignPhotos
+  ) {
+
+    setNotice({
+
+      title:
+        "Selección no válida",
+
+      message:
+        "Solo puedes eliminar las fotografías que tú compartiste.",
+
+      tone:
+        "info"
+
+    });
+
+
+    return;
+
+  }
+
+
+  setPendingDeletePhotos(
+    [
+      ...selectedOwnPhotos
+    ]
+  );
+
+
+  setBulkDeleteCurrent(
+    0
+  );
+
+
+  setBulkDeleteTotal(
+    selectedOwnPhotos.length
+  );
+
+
+  setBulkDeleteError(
+    ""
+  );
+
+
+  setBulkDeleteStatus(
+    "confirm"
+  );
+
+}
+
+
+function cancelBulkDeleteConfirmation() {
+
+  setPendingDeletePhotos(
+    []
+  );
+
+
+  setBulkDeleteCurrent(
+    0
+  );
+
+
+  setBulkDeleteTotal(
+    0
+  );
+
+
+  setBulkDeleteError(
+    ""
+  );
+
+
+  setBulkDeleteStatus(
+    "idle"
+  );
+
+}
+
+
+async function confirmBulkDelete() {
+
+  const targetPhotos =
+    [
+      ...pendingDeletePhotos
+    ];
+
+
+  if (
+    targetPhotos.length ===
+    0
+  ) {
+
+    setBulkDeleteStatus(
+      "idle"
+    );
+
+
+    return;
+
+  }
+
+
+  setBulkDeleteStatus(
+    "running"
+  );
+
+
+  setBulkDeleteCurrent(
+    0
+  );
+
+
+  setBulkDeleteTotal(
+    targetPhotos.length
+  );
+
+
+  setBulkDeleteError(
+    ""
+  );
+
+
+  const deletedIds =
+    new Set<string>();
+
+
+  try {
+
+    const token =
+      await getAccessToken();
+
+
+    if (
+      !token
+    ) {
+
+      throw new Error(
+        "No se pudo validar tu sesión."
+      );
+
+    }
+
+
+    for (
+      let index = 0;
+      index <
+        targetPhotos.length;
+      index += 1
+    ) {
+
+      const photo =
+        targetPhotos[index];
+
+
+      /*
+       * Verificación adicional antes
+       * de cada eliminación.
+       */
+
+      if (
+        photo.owner_id !==
+        userId
+      ) {
+
+        throw new Error(
+          "La selección contiene una fotografía que no te pertenece."
+        );
+
+      }
+
+
+      const response =
+        await fetch(
+
+          "/api/photos/delete",
+
+          {
+
+            method:
+              "POST",
+
+            headers: {
+
+              Authorization:
+                `Bearer ${token}`,
+
+              "Content-Type":
+                "application/json"
+
+            },
+
+            body:
+              JSON.stringify({
+
+                id:
+                  photo.id
+
+              })
+
+          }
+
+        );
+
+
+      const body =
+        await response
+          .json()
+          .catch(
+            () => null
+          );
+
+
+      if (
+        !response.ok
+      ) {
+
+        throw new Error(
+          body?.error ??
+          "No se pudo eliminar una de las fotografías."
+        );
+
+      }
+
+
+      deletedIds.add(
+        photo.id
+      );
+
+
+      setBulkDeleteCurrent(
+        index +
+        1
+      );
+
+    }
+
+
+    /*
+     * Actualizar inmediatamente la interfaz.
+     */
+
+    setPhotos(
+      (
+        previous
+      ) =>
+        previous.filter(
+          (
+            photo
+          ) =>
+            !deletedIds.has(
+              photo.id
+            )
+        )
+    );
+
+
+    setFavoriteIds(
+      (
+        previous
+      ) => {
+
+        const next =
+          new Set<string>(
+            previous
+          );
+
+
+        deletedIds.forEach(
+          (
+            id
+          ) =>
+            next.delete(
+              id
+            )
+        );
+
+
+        return next;
+
+      }
+    );
+
+
+    setSelectedIds(
+      new Set<string>()
+    );
+
+
+    setSelectionMode(
+      false
+    );
+
+
+    setBulkDeleteStatus(
+      "completed"
+    );
+
+
+    window.dispatchEvent(
+      new Event(
+        "mis15:gallery-refresh"
+      )
+    );
+
+
+  } catch (
+    error
+  ) {
+
+    console.error(
+      "Error eliminando fotografías:",
+      error
+    );
+
+
+    /*
+     * Las que sí alcanzaron a eliminarse
+     * desaparecen igualmente de la interfaz.
+     */
+
+    if (
+      deletedIds.size >
+      0
+    ) {
+
+      setPhotos(
+        (
+          previous
+        ) =>
+          previous.filter(
+            (
+              photo
+            ) =>
+              !deletedIds.has(
+                photo.id
+              )
+          )
+      );
+
+
+      setSelectedIds(
+        (
+          previous
+        ) => {
+
+          const next =
+            new Set<string>(
+              previous
+            );
+
+
+          deletedIds.forEach(
+            (
+              id
+            ) =>
+              next.delete(
+                id
+              )
+          );
+
+
+          return next;
+
+        }
+      );
+
+    }
+
+
+    setBulkDeleteError(
+      error instanceof Error
+        ? error.message
+        : "No se pudieron eliminar todas las fotografías."
+    );
+
+
+    setBulkDeleteStatus(
+      "error"
+    );
+
+  }
+
+}
+
+
+function closeBulkDeleteModal() {
+
+  if (
+    bulkDeleteStatus ===
+    "running"
+  ) {
+
+    return;
+
+  }
+
+
+  setPendingDeletePhotos(
+    []
+  );
+
+
+  setBulkDeleteCurrent(
+    0
+  );
+
+
+  setBulkDeleteTotal(
+    0
+  );
+
+
+  setBulkDeleteError(
+    ""
+  );
+
+
+  setBulkDeleteStatus(
+    "idle"
+  );
+
+}
 
   /* =======================================================
      DESCARGA MASIVA
@@ -3091,6 +3632,36 @@ useEffect(
         }
 
       </div>
+
+{
+  isOffline && (
+
+    <div
+      className="
+        mb-4
+        rounded-2xl
+        border
+        border-[#ead9ba]
+        bg-[#fff8e9]
+        px-4
+        py-3
+        text-sm
+        leading-6
+        text-[#806333]
+      "
+    >
+      <strong>
+        Sin conexión.
+      </strong>
+      {" "}
+      Puedes seguir viendo los recuerdos ya cargados.
+      Las nuevas fotos pendientes se compartirán
+      automáticamente cuando vuelva internet.
+    </div>
+
+  )
+}
+
 
 
       {/* ERROR GENERAL */}

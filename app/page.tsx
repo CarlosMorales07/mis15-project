@@ -20,6 +20,9 @@ import {
   eventConfig
 } from "@/lib/event-config";
 
+import EventQrButton
+  from "@/components/EventQrButton";
+
 
 export default function HomePage() {
 
@@ -427,6 +430,36 @@ export default function HomePage() {
           }
 
         </div>
+
+        {/* =================================================
+    INVITAR A MÁS PERSONAS
+================================================== */}
+
+<div
+  className="
+    relative
+    mt-6
+  "
+>
+
+  <p
+    className="
+      mx-auto
+      mb-3
+      max-w-xs
+      text-xs
+      leading-5
+      text-[#8b7486]
+    "
+  >
+    ¿Quieres invitar a alguien más
+    a compartir sus recuerdos?
+  </p>
+
+
+  <EventQrButton />
+
+</div>
 
       </section>
 
