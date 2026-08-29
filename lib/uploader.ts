@@ -11,10 +11,6 @@ import {
 } from "@/lib/queue";
 
 
-/* =========================================================
-   TIPOS
-   ========================================================= */
-
 export type ProcessQueueResult = {
 
   uploaded:
@@ -24,6 +20,70 @@ export type ProcessQueueResult = {
     number;
 
 };
+
+
+export type UploadProgressDetail = {
+
+  status:
+    | "start"
+    | "progress"
+    | "completed"
+    | "pending";
+
+  current:
+    number;
+
+  total:
+    number;
+
+  pending:
+    number;
+
+};
+
+
+/*
+ * Evita que dos eventos diferentes
+ * intenten procesar la misma cola
+ * al mismo tiempo.
+ */
+
+let processingPromise:
+  Promise<ProcessQueueResult> |
+  null =
+    null;
+
+
+/* =========================================================
+   EVENTOS DE PROGRESO
+   ========================================================= */
+
+function emitProgress(
+  detail: UploadProgressDetail
+) {
+
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+
+    return;
+
+  }
+
+
+  window.dispatchEvent(
+
+    new CustomEvent<UploadProgressDetail>(
+      "mis15:upload-progress",
+      {
+        detail
+      }
+    )
+
+  );
+
+}
 
 
 /* =========================================================
@@ -89,11 +149,6 @@ async function fetchWithRetry(
         );
 
 
-      /*
-       * Errores temporales del servidor.
-       * En estos casos sí vale la pena reintentar.
-       */
-
       if (
         response.status === 408 ||
         response.status === 429 ||
@@ -119,42 +174,28 @@ async function fetchWithRetry(
 
 
       console.warn(
-        `${label} - intento ${attempt} de ${attempts} falló:`,
+        `${label} - intento ${attempt} de ${attempts}:`,
         error
       );
 
 
       if (
-        attempt === attempts
+        attempt <
+        attempts
       ) {
 
-        break;
-
-      }
-
-
-      /*
-       * Esperas progresivas:
-       *
-       * intento 1 → 1 segundo
-       * intento 2 → 2 segundos
-       * intento 3 → 4 segundos
-       */
-
-      const delay =
-        Math.min(
-          1000 *
-          Math.pow(
-            2,
-            attempt - 1
-          ),
-          5000
+        await wait(
+          Math.min(
+            1000 *
+            Math.pow(
+              2,
+              attempt - 1
+            ),
+            5000
+          )
         );
 
-
-      await wait(
-        delay
-      );
+      }
 
     }
 
@@ -203,9 +244,7 @@ async function uploadOne(
     await getAccessToken();
 
 
-  /* =====================================================
-     1. PEDIR FIRMA
-     ===================================================== */
+  /* 1. FIRMA */
 
   const signed =
     await fetchWithRetry(
@@ -246,10 +285,7 @@ async function uploadOne(
     await signed.json();
 
 
-
-  /* =====================================================
-     2. RECONSTRUIR BLOB
-     ===================================================== */
+  /* 2. RECONSTRUIR IMAGEN */
 
   const blob =
     new Blob(
@@ -259,20 +295,15 @@ async function uploadOne(
       ],
 
       {
-
         type:
           item.mimeType ||
           "image/jpeg"
-
       }
 
     );
 
 
-
-  /* =====================================================
-     3. PREPARAR FORMULARIO CLOUDINARY
-     ===================================================== */
+  /* 3. CLOUDINARY */
 
   const form =
     new FormData();
@@ -311,11 +342,6 @@ async function uploadOne(
   );
 
 
-
-  /* =====================================================
-     4. SUBIR A CLOUDINARY
-     ===================================================== */
-
   const cloud =
     await fetchWithRetry(
 
@@ -340,20 +366,6 @@ async function uploadOne(
     !cloud.ok
   ) {
 
-    const cloudError =
-      await cloud
-        .text()
-        .catch(
-          () => ""
-        );
-
-
-    console.error(
-      "Cloudinary rechazó la fotografía:",
-      cloudError
-    );
-
-
     throw new Error(
       "Cloudinary rechazó la fotografía."
     );
@@ -365,10 +377,7 @@ async function uploadOne(
     await cloud.json();
 
 
-
-  /* =====================================================
-     5. REGISTRAR EN SUPABASE
-     ===================================================== */
+  /* 4. SUPABASE */
 
   const confirmed =
     await fetchWithRetry(
@@ -412,20 +421,6 @@ async function uploadOne(
     !confirmed.ok
   ) {
 
-    const confirmError =
-      await confirmed
-        .text()
-        .catch(
-          () => ""
-        );
-
-
-    console.error(
-      "Error registrando fotografía:",
-      confirmError
-    );
-
-
     throw new Error(
       "No se pudo registrar la fotografía."
     );
@@ -433,20 +428,12 @@ async function uploadOne(
   }
 
 
-
-  /* =====================================================
-     6. ELIMINAR DE LA COLA
-     ===================================================== */
+  /* 5. QUITAR DE COLA */
 
   await queueDelete(
     item.id
   );
 
-
-
-  /* =====================================================
-     7. ACTUALIZAR INTERFAZ
-     ===================================================== */
 
   window.dispatchEvent(
 
@@ -469,16 +456,15 @@ async function uploadOne(
 
 
 /* =========================================================
-   PROCESAR COLA
+   PROCESAMIENTO INTERNO
    ========================================================= */
 
-export async function processQueue():
+async function runQueue():
   Promise<ProcessQueueResult> {
 
-  /*
-   * Sin internet no intentamos subir.
-   * Las fotos permanecen almacenadas.
-   */
+  const initialPending =
+    await queueCount();
+
 
   if (
     typeof navigator !==
@@ -486,13 +472,30 @@ export async function processQueue():
     !navigator.onLine
   ) {
 
+    emitProgress({
+
+      status:
+        "pending",
+
+      current:
+        0,
+
+      total:
+        initialPending,
+
+      pending:
+        initialPending
+
+    });
+
+
     return {
 
       uploaded:
         0,
 
       pending:
-        await queueCount()
+        initialPending
 
     };
 
@@ -504,15 +507,51 @@ export async function processQueue():
       await queueAll()
     )
       .sort(
-
         (
           a,
           b
         ) =>
           a.createdAt -
           b.createdAt
-
       );
+
+
+  const total =
+    items.length;
+
+
+  if (
+    total ===
+    0
+  ) {
+
+    return {
+
+      uploaded:
+        0,
+
+      pending:
+        0
+
+    };
+
+  }
+
+
+  emitProgress({
+
+    status:
+      "start",
+
+    current:
+      0,
+
+    total,
+
+    pending:
+      total
+
+  });
 
 
   let uploaded =
@@ -534,18 +573,29 @@ export async function processQueue():
         1;
 
 
+      const remaining =
+        await queueCount();
+
+
+      emitProgress({
+
+        status:
+          "progress",
+
+        current:
+          uploaded,
+
+        total,
+
+        pending:
+          remaining
+
+      });
+
+
     } catch (
       error
     ) {
-
-      /*
-       * MUY IMPORTANTE:
-       *
-       * No eliminamos la fotografía.
-       *
-       * Sigue almacenada en IndexedDB
-       * para poder reintentar después.
-       */
 
       console.error(
         "La fotografía continuará pendiente:",
@@ -564,6 +614,45 @@ export async function processQueue():
     await queueCount();
 
 
+  if (
+    pending ===
+    0
+  ) {
+
+    emitProgress({
+
+      status:
+        "completed",
+
+      current:
+        uploaded,
+
+      total,
+
+      pending:
+        0
+
+    });
+
+  } else {
+
+    emitProgress({
+
+      status:
+        "pending",
+
+      current:
+        uploaded,
+
+      total,
+
+      pending
+
+    });
+
+  }
+
+
   return {
 
     uploaded,
@@ -571,5 +660,44 @@ export async function processQueue():
     pending
 
   };
+
+}
+
+
+/* =========================================================
+   FUNCIÓN PÚBLICA
+   ========================================================= */
+
+export async function processQueue():
+  Promise<ProcessQueueResult> {
+
+  /*
+   * Si ya existe un procesamiento,
+   * reutilizamos el mismo.
+   */
+
+  if (
+    processingPromise
+  ) {
+
+    return processingPromise;
+
+  }
+
+
+  processingPromise =
+    runQueue();
+
+
+  try {
+
+    return await processingPromise;
+
+  } finally {
+
+    processingPromise =
+      null;
+
+  }
 
 }

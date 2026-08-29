@@ -7,6 +7,9 @@ import Gallery
 
 import UploadPanel
   from "@/components/UploadPanel";
+  
+  import EventQrButton
+  from "@/components/EventQrButton";
 
 import {
   eventConfig

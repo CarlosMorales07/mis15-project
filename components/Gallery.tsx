@@ -654,6 +654,17 @@ export default function Gallery() {
   ] =
     useState("");
 
+    const [
+  isOffline,
+  setIsOffline
+] =
+  useState(
+    typeof navigator !==
+      "undefined"
+      ? !navigator.onLine
+      : false
+  );
+
 
   const [
     notice,
@@ -1148,18 +1159,38 @@ useEffect(
 
 
         } catch (
-          error
-        ) {
+  error
+) {
 
-          console.error(
-            "Error cargando galería:",
-            error
-          );
+  console.error(
+    "Error cargando galería:",
+    error
+  );
 
 
-          setErrorMessage(
-            "No pudimos cargar los recuerdos. Revisa tu conexión e inténtalo nuevamente."
-          );
+  if (
+    typeof navigator !==
+      "undefined" &&
+    !navigator.onLine
+  ) {
+
+    setIsOffline(
+      true
+    );
+
+
+    setErrorMessage(
+      ""
+    );
+
+
+  } else {
+
+    setErrorMessage(
+      "No pudimos actualizar los recuerdos. Inténtalo nuevamente."
+    );
+
+  }
 
 
         } finally {
@@ -1220,11 +1251,35 @@ useEffect(
 
 
       const onlineHandler =
-        () => {
+  () => {
 
-          void loadGallery();
+    setIsOffline(
+      false
+    );
 
-        };
+
+    setErrorMessage(
+      ""
+    );
+
+
+    void loadGallery();
+
+  };
+
+  const offlineHandler =
+  () => {
+
+    setIsOffline(
+      true
+    );
+
+
+    setErrorMessage(
+      ""
+    );
+
+  };
 
 
       const visibilityHandler =

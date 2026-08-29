@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useRef,
   useState
 } from "react";
@@ -26,6 +27,28 @@ import {
   processQueue
 } from "@/lib/uploader";
 
+import type {
+  UploadProgressDetail
+} from "@/lib/uploader";
+
+
+type StatusKind =
+  | "info"
+  | "success"
+  | "offline"
+  | "error";
+
+
+type StatusState = {
+
+  text:
+    string;
+
+  kind:
+    StatusKind;
+
+} | null;
+
 
 function getErrorMessage(
   error: unknown
@@ -41,7 +64,8 @@ function getErrorMessage(
 
 
   if (
-    typeof error === "string"
+    typeof error ===
+    "string"
   ) {
 
     return error;
@@ -72,7 +96,9 @@ export default function UploadPanel() {
     status,
     setStatus
   ] =
-    useState("");
+    useState<StatusState>(
+      null
+    );
 
 
   const [
@@ -82,6 +108,223 @@ export default function UploadPanel() {
     useState(false);
 
 
+  /*
+   * =======================================================
+   * ESCUCHAR PROGRESO GLOBAL
+   * =======================================================
+   *
+   * También funciona cuando las fotos se
+   * vuelven a subir después de recuperar internet.
+   */
+
+  useEffect(
+    () => {
+
+      function handleProgress(
+        event: Event
+      ) {
+
+        const customEvent =
+          event as CustomEvent<
+            UploadProgressDetail
+          >;
+
+
+        const detail =
+          customEvent.detail;
+
+
+        if (
+          detail.status ===
+          "start"
+        ) {
+
+          setWorking(
+            true
+          );
+
+
+          setStatus({
+
+            kind:
+              "info",
+
+            text:
+              detail.total === 1
+                ? "Compartiendo tu fotografía..."
+                : `Compartiendo 0 de ${detail.total} fotografías...`
+
+          });
+
+
+          return;
+
+        }
+
+
+        if (
+          detail.status ===
+          "progress"
+        ) {
+
+          setWorking(
+            true
+          );
+
+
+          setStatus({
+
+            kind:
+              "info",
+
+            text:
+              detail.total === 1
+                ? "Compartiendo tu fotografía..."
+                : `Compartiendo ${detail.current} de ${detail.total} fotografías...`
+
+          });
+
+
+          return;
+
+        }
+
+
+        if (
+          detail.status ===
+          "completed"
+        ) {
+
+          setWorking(
+            false
+          );
+
+
+          setStatus({
+
+            kind:
+              "success",
+
+            text:
+              detail.total === 1
+                ? "✨ ¡Listo! Tu recuerdo fue compartido."
+                : `✨ ¡Listo! ${detail.total} recuerdos fueron compartidos.`
+
+          });
+
+
+          return;
+
+        }
+
+
+        if (
+          detail.status ===
+          "pending"
+        ) {
+
+          setWorking(
+            false
+          );
+
+
+          if (
+            detail.pending >
+            0
+          ) {
+
+            setStatus({
+
+              kind:
+                "offline",
+
+              text:
+                detail.pending === 1
+                  ? "Tu foto quedó guardada. Se compartirá automáticamente cuando vuelva la conexión."
+                  : `Tus ${detail.pending} fotos quedaron guardadas. Se compartirán automáticamente cuando vuelva la conexión.`
+
+            });
+
+          }
+
+        }
+
+      }
+
+
+      window.addEventListener(
+        "mis15:upload-progress",
+        handleProgress
+      );
+
+
+      return () => {
+
+        window.removeEventListener(
+          "mis15:upload-progress",
+          handleProgress
+        );
+
+      };
+
+    },
+    []
+  );
+
+
+  /*
+   * =======================================================
+   * OCULTAR MENSAJE DE ÉXITO
+   * =======================================================
+   */
+
+  useEffect(
+    () => {
+
+      if (
+        status?.kind !==
+        "success"
+      ) {
+
+        return;
+
+      }
+
+
+      const timeout =
+        window.setTimeout(
+          () => {
+
+            setStatus(
+              null
+            );
+
+          },
+          7000
+        );
+
+
+      return () => {
+
+        window.clearTimeout(
+          timeout
+        );
+
+      };
+
+    },
+    [
+      status
+    ]
+  );
+
+
+  /*
+   * =======================================================
+   * ARCHIVOS
+   * =======================================================
+   */
+
   async function handleFiles(
     files:
       FileList | null
@@ -89,7 +332,8 @@ export default function UploadPanel() {
 
     if (
       !files ||
-      files.length === 0
+      files.length ===
+        0
     ) {
 
       return;
@@ -113,115 +357,82 @@ export default function UploadPanel() {
 
     try {
 
-      /* =================================================
-         PREPARAR CADA FOTO
-         ================================================= */
-
       for (
         let index = 0;
-        index < selected.length;
+        index <
+          selected.length;
         index += 1
       ) {
 
         const file =
-          selected[index];
+          selected[
+            index
+          ];
 
 
-        setStatus(
-          `Preparando ${index + 1} de ${selected.length}...`
-        );
+        setStatus({
+
+          kind:
+            "info",
+
+          text:
+            selected.length === 1
+              ? "Preparando fotografía..."
+              : `Preparando ${index + 1} de ${selected.length} fotografías...`
+
+        });
 
 
-        let prepared:
-          File;
-
-
-        try {
-
-          prepared =
-            await prepareImage(
-              file
-            );
-
-
-        } catch (
-          error
-        ) {
-
-          console.error(
-            "Error preparando imagen:",
-            error
+        const prepared =
+          await prepareImage(
+            file
           );
 
 
-          throw new Error(
-            `No se pudo preparar la fotografía. ${getErrorMessage(error)}`
-          );
+        await queueAdd({
 
-        }
+          id:
+            crypto.randomUUID(),
 
+          blob:
+            prepared,
 
-        /* ===============================================
-           GUARDAR EN COLA SEGURA
-           =============================================== */
+          filename:
+            prepared.name,
 
-        setStatus(
-          `Guardando ${index + 1} de ${selected.length}...`
-        );
+          createdAt:
+            Date.now()
 
-
-        try {
-
-          await queueAdd({
-
-            id:
-              crypto.randomUUID(),
-
-            blob:
-              prepared,
-
-            filename:
-              prepared.name,
-
-            createdAt:
-              Date.now()
-
-          });
-
-
-        } catch (
-          error
-        ) {
-
-          console.error(
-            "Error guardando fotografía:",
-            error
-          );
-
-
-          throw new Error(
-            `No se pudo guardar temporalmente la fotografía. ${getErrorMessage(error)}`
-          );
-
-        }
+        });
 
       }
 
 
-
-      /* =================================================
-         SIN INTERNET
-         ================================================= */
+      /*
+       * Sin conexión:
+       * quedan en IndexedDB.
+       */
 
       if (
         !navigator.onLine
       ) {
 
-        setStatus(
-          selected.length === 1
-            ? "Tu foto quedó guardada. Se compartirá automáticamente cuando vuelva la conexión."
-            : "Tus fotos quedaron guardadas. Se compartirán automáticamente cuando vuelva la conexión."
+        setWorking(
+          false
         );
+
+
+        setStatus({
+
+          kind:
+            "offline",
+
+          text:
+            selected.length === 1
+              ? "Tu foto quedó guardada. Se compartirá automáticamente cuando vuelva la conexión."
+              : `Tus ${selected.length} fotos quedaron guardadas. Se compartirán automáticamente cuando vuelva la conexión.`
+
+        });
 
 
         return;
@@ -229,84 +440,17 @@ export default function UploadPanel() {
       }
 
 
+      /*
+       * processQueue enviará los
+       * eventos reales de progreso.
+       */
 
-      /* =================================================
-         INTENTAR SUBIR
-         ================================================= */
-
-      setStatus(
-        selected.length === 1
-          ? "Subiendo fotografía..."
-          : "Subiendo fotografías..."
-      );
-
-
-      const result =
-        await processQueue();
-
-
-
-      /* =================================================
-         TODO SUBIDO
-         ================================================= */
-
-      if (
-        result.pending === 0
-      ) {
-
-        setStatus(
-          selected.length === 1
-            ? "✨ ¡Listo! Tu recuerdo fue compartido."
-            : "✨ ¡Listo! Tus recuerdos fueron compartidos."
-        );
-
-
-        return;
-
-      }
-
-
-
-      /* =================================================
-         ALGUNAS QUEDARON PENDIENTES
-         ================================================= */
-
-      if (
-        result.uploaded >
-        0
-      ) {
-
-        setStatus(
-          "✨ Algunas fotos ya se compartieron. Las restantes quedaron guardadas y la app volverá a intentarlo automáticamente."
-        );
-
-
-        return;
-
-      }
-
-
-
-      /* =================================================
-         CONEXIÓN INESTABLE
-         ================================================= */
-
-      setStatus(
-        selected.length === 1
-          ? "Tu foto quedó guardada. La conexión está inestable y volveremos a intentar subirla automáticamente."
-          : "Tus fotos quedaron guardadas. La conexión está inestable y volveremos a intentar subirlas automáticamente."
-      );
+      await processQueue();
 
 
     } catch (
       error
     ) {
-
-      const detail =
-        getErrorMessage(
-          error
-        );
-
 
       console.error(
         "Error procesando fotografías:",
@@ -314,17 +458,23 @@ export default function UploadPanel() {
       );
 
 
-      setStatus(
-        detail
-      );
-
-
-    } finally {
-
       setWorking(
         false
       );
 
+
+      setStatus({
+
+        kind:
+          "error",
+
+        text:
+          `No se pudo preparar una fotografía. ${getErrorMessage(error)}`
+
+      });
+
+
+    } finally {
 
       if (
         cameraInputRef.current
@@ -359,8 +509,6 @@ export default function UploadPanel() {
       "
     >
 
-      {/* TÍTULO */}
-
       <h2
         className="
           font-title
@@ -368,15 +516,12 @@ export default function UploadPanel() {
           font-semibold
           leading-tight
           text-[#5f435a]
-
           sm:text-[1.85rem]
         "
       >
         Comparte este momento conmigo
       </h2>
 
-
-      {/* SUBTÍTULO */}
 
       <p
         className="
@@ -391,8 +536,6 @@ export default function UploadPanel() {
         de tu galería.
       </p>
 
-
-      {/* CÁMARA */}
 
       <input
         ref={
@@ -413,8 +556,6 @@ export default function UploadPanel() {
       />
 
 
-      {/* GALERÍA */}
-
       <input
         ref={
           galleryInputRef
@@ -433,8 +574,6 @@ export default function UploadPanel() {
         }
       />
 
-
-      {/* BOTONES */}
 
       <div
         className="
@@ -468,12 +607,9 @@ export default function UploadPanel() {
             shadow-[0_8px_20px_rgba(118,80,113,0.22)]
             transition-all
             duration-200
-
             hover:scale-[1.03]
             hover:bg-[#5f3e5b]
-
             active:scale-[0.98]
-
             disabled:cursor-not-allowed
             disabled:opacity-55
           "
@@ -511,12 +647,9 @@ export default function UploadPanel() {
             shadow-[0_8px_20px_rgba(194,139,162,0.20)]
             transition-all
             duration-200
-
             hover:scale-[1.03]
             hover:bg-[#ad748d]
-
             active:scale-[0.98]
-
             disabled:cursor-not-allowed
             disabled:opacity-55
           "
@@ -533,25 +666,35 @@ export default function UploadPanel() {
       </div>
 
 
-      {/* ESTADO */}
-
       {
         status && (
 
-          <p
-            className="
+          <div
+            className={`
               mt-4
               rounded-2xl
-              bg-white/55
+              border
               px-4
               py-3
-              text-xs
-              leading-5
-              text-[#765f72]
-            "
+              text-sm
+              leading-6
+
+              ${
+                status.kind ===
+                  "success"
+                  ? "border-[#dbe9d5] bg-[#f0f7ed] text-[#55704f]"
+                  : status.kind ===
+                      "offline"
+                    ? "border-[#ead9ba] bg-[#fff8e9] text-[#806333]"
+                    : status.kind ===
+                        "error"
+                      ? "border-red-200 bg-red-50 text-red-700"
+                      : "border-white/70 bg-white/55 text-[#765f72]"
+              }
+            `}
           >
-            {status}
-          </p>
+            {status.text}
+          </div>
 
         )
       }
