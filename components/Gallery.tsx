@@ -61,12 +61,14 @@ type DownloadStatus =
   | "cancelled"
   | "error";
 
-  type BulkDeleteStatus =
+
+type BulkDeleteStatus =
   | "idle"
   | "confirm"
   | "running"
   | "completed"
   | "error";
+
 
 type NoticeState = {
 
@@ -110,6 +112,7 @@ function ModalPortal({
       setMounted(
         true
       );
+
 
       return () => {
 
@@ -157,6 +160,7 @@ function getThumbnailUrl(
 
 }
 
+
 function getViewerPreviewUrl(
   url: string
 ) {
@@ -167,6 +171,7 @@ function getViewerPreviewUrl(
   );
 
 }
+
 
 function getViewerUrl(
   url: string
@@ -194,7 +199,7 @@ function getViewerUrl(
 
 
 /* =========================================================
-   NOMBRE DE ARCHIVO
+   NOMBRE DEL ARCHIVO
    ========================================================= */
 
 function getPhotoFilename(
@@ -303,7 +308,7 @@ function downloadBlob(
 
 
 /* =========================================================
-   DETECTAR MÓVIL
+   DISPOSITIVOS
    ========================================================= */
 
 function isMobileLikeDevice() {
@@ -329,6 +334,7 @@ function isMobileLikeDevice() {
   );
 
 }
+
 
 function isIOSDevice() {
 
@@ -526,11 +532,13 @@ async function savePhoto(
     try {
 
       await navigator.share({
+
         files:
           [file],
 
         title:
           "Recuerdo de los 15 de Fernanda"
+
       });
 
 
@@ -660,16 +668,17 @@ export default function Gallery() {
   ] =
     useState("");
 
-    const [
-  isOffline,
-  setIsOffline
-] =
-  useState(
-    typeof navigator !==
-      "undefined"
-      ? !navigator.onLine
-      : false
-  );
+
+  const [
+    isOffline,
+    setIsOffline
+  ] =
+    useState(
+      typeof navigator !==
+        "undefined"
+        ? !navigator.onLine
+        : false
+    );
 
 
   const [
@@ -682,7 +691,7 @@ export default function Gallery() {
 
 
   /* =======================================================
-     ELIMINACIÓN
+     ELIMINAR UNA
      ======================================================= */
 
   const [
@@ -706,7 +715,7 @@ export default function Gallery() {
 
 
   /* =======================================================
-     SELECCIÓN
+     MODO SELECCIÓN PARA DESCARGAR
      ======================================================= */
 
   const [
@@ -725,6 +734,67 @@ export default function Gallery() {
     >(
       new Set<string>()
     );
+
+
+  /* =======================================================
+     MODO ELIMINAR FOTOS
+     ======================================================= */
+
+  const [
+    deleteMode,
+    setDeleteMode
+  ] =
+    useState(false);
+
+
+  const [
+    deleteSelectedIds,
+    setDeleteSelectedIds
+  ] =
+    useState<
+      Set<string>
+    >(
+      new Set<string>()
+    );
+
+
+  const [
+    bulkDeleteStatus,
+    setBulkDeleteStatus
+  ] =
+    useState<BulkDeleteStatus>(
+      "idle"
+    );
+
+
+  const [
+    pendingDeletePhotos,
+    setPendingDeletePhotos
+  ] =
+    useState<Photo[]>(
+      []
+    );
+
+
+  const [
+    bulkDeleteCurrent,
+    setBulkDeleteCurrent
+  ] =
+    useState(0);
+
+
+  const [
+    bulkDeleteTotal,
+    setBulkDeleteTotal
+  ] =
+    useState(0);
+
+
+  const [
+    bulkDeleteError,
+    setBulkDeleteError
+  ] =
+    useState("");
 
 
   /* =======================================================
@@ -773,198 +843,150 @@ export default function Gallery() {
   const cancelDownloadRef =
     useRef(false);
 
-/* =======================================================
-   ELIMINACIÓN MÚLTIPLE
-   ======================================================= */
-
-const [
-  bulkDeleteStatus,
-  setBulkDeleteStatus
-] =
-  useState<BulkDeleteStatus>(
-    "idle"
-  );
-
-
-const [
-  pendingDeletePhotos,
-  setPendingDeletePhotos
-] =
-  useState<Photo[]>(
-    []
-  );
-
-
-const [
-  bulkDeleteCurrent,
-  setBulkDeleteCurrent
-] =
-  useState(0);
-
-
-const [
-  bulkDeleteTotal,
-  setBulkDeleteTotal
-] =
-  useState(0);
-
-
-const [
-  bulkDeleteError,
-  setBulkDeleteError
-] =
-  useState("");
-
 
   /* =======================================================
-     BLOQUEAR SCROLL CUANDO HAY MODAL
+     MODAL / BLOQUEO DE SCROLL
      ======================================================= */
 
   const modalIsOpen =
-  Boolean(
-    openPhoto ||
-    deleteCandidate ||
-    notice ||
-    downloadStatus !==
-      "idle" ||
-    bulkDeleteStatus !==
-      "idle"
-  );
+    Boolean(
+      openPhoto ||
+      deleteCandidate ||
+      notice ||
+      downloadStatus !==
+        "idle" ||
+      bulkDeleteStatus !==
+        "idle"
+    );
 
 
-useEffect(
-  () => {
+  useEffect(
+    () => {
 
-    if (
-      !modalIsOpen
-    ) {
+      if (
+        !modalIsOpen
+      ) {
 
-      return;
+        return;
 
-    }
-
-
-    const scrollY =
-      window.scrollY;
+      }
 
 
-    const body =
-      document.body;
+      const scrollY =
+        window.scrollY;
 
 
-    const html =
-      document.documentElement;
+      const body =
+        document.body;
 
 
-    const previousPosition =
-      body.style.position;
-
-    const previousTop =
-      body.style.top;
-
-    const previousLeft =
-      body.style.left;
-
-    const previousRight =
-      body.style.right;
-
-    const previousWidth =
-      body.style.width;
-
-    const previousOverflow =
-      body.style.overflow;
-
-    const previousHtmlOverflow =
-      html.style.overflow;
-
-    const previousScrollBehavior =
-      html.style.scrollBehavior;
+      const html =
+        document.documentElement;
 
 
-    body.style.position =
-      "fixed";
+      const previousPosition =
+        body.style.position;
 
-    body.style.top =
-      `-${scrollY}px`;
+      const previousTop =
+        body.style.top;
 
-    body.style.left =
-      "0";
+      const previousLeft =
+        body.style.left;
 
-    body.style.right =
-      "0";
+      const previousRight =
+        body.style.right;
 
-    body.style.width =
-      "100%";
+      const previousWidth =
+        body.style.width;
 
-    body.style.overflow =
-      "hidden";
+      const previousOverflow =
+        body.style.overflow;
 
+      const previousHtmlOverflow =
+        html.style.overflow;
 
-    html.style.overflow =
-      "hidden";
-
-
-    return () => {
-
-      /*
-       * Impedir que scroll-behavior:smooth
-       * anime la restauración.
-       */
-
-      html.style.scrollBehavior =
-        "auto";
-
-
-      html.style.overflow =
-        previousHtmlOverflow;
+      const previousScrollBehavior =
+        html.style.scrollBehavior;
 
 
       body.style.position =
-        previousPosition;
+        "fixed";
 
       body.style.top =
-        previousTop;
+        `-${scrollY}px`;
 
       body.style.left =
-        previousLeft;
+        "0";
 
       body.style.right =
-        previousRight;
+        "0";
 
       body.style.width =
-        previousWidth;
+        "100%";
 
       body.style.overflow =
-        previousOverflow;
+        "hidden";
 
 
-      window.scrollTo(
-        0,
-        scrollY
-      );
+      html.style.overflow =
+        "hidden";
 
 
-      window.requestAnimationFrame(
-        () => {
+      return () => {
 
-          html.style.scrollBehavior =
-            previousScrollBehavior;
+        html.style.scrollBehavior =
+          "auto";
 
-        }
-      );
 
-    };
+        html.style.overflow =
+          previousHtmlOverflow;
 
-  },
 
-  [
-    modalIsOpen
-  ]
-);
+        body.style.position =
+          previousPosition;
+
+        body.style.top =
+          previousTop;
+
+        body.style.left =
+          previousLeft;
+
+        body.style.right =
+          previousRight;
+
+        body.style.width =
+          previousWidth;
+
+        body.style.overflow =
+          previousOverflow;
+
+
+        window.scrollTo(
+          0,
+          scrollY
+        );
+
+
+        window.requestAnimationFrame(
+          () => {
+
+            html.style.scrollBehavior =
+              previousScrollBehavior;
+
+          }
+        );
+
+      };
+
+    },
+    [
+      modalIsOpen
+    ]
+  );
 
 
   /* =======================================================
-     ESTADO DEL VISOR
+     ESTADO VISOR
      ======================================================= */
 
   useEffect(
@@ -1121,21 +1143,57 @@ useEffect(
           );
 
 
+          const existingIds =
+            new Set<string>(
+              loadedPhotos.map(
+                (
+                  photo
+                ) =>
+                  photo.id
+              )
+            );
+
+
           setSelectedIds(
             (
               previous
             ) => {
 
-              const existingIds =
-                new Set<string>(
-                  loadedPhotos.map(
-                    (
-                      photo
-                    ) =>
-                      photo.id
-                  )
-                );
+              const next =
+                new Set<string>();
 
+
+              previous.forEach(
+                (
+                  id
+                ) => {
+
+                  if (
+                    existingIds.has(
+                      id
+                    )
+                  ) {
+
+                    next.add(
+                      id
+                    );
+
+                  }
+
+                }
+              );
+
+
+              return next;
+
+            }
+          );
+
+
+          setDeleteSelectedIds(
+            (
+              previous
+            ) => {
 
               const next =
                 new Set<string>();
@@ -1209,38 +1267,38 @@ useEffect(
 
 
         } catch (
-  error
-) {
+          error
+        ) {
 
-  console.error(
-    "Error cargando galería:",
-    error
-  );
-
-
-  if (
-    typeof navigator !==
-      "undefined" &&
-    !navigator.onLine
-  ) {
-
-    setIsOffline(
-      true
-    );
+          console.error(
+            "Error cargando galería:",
+            error
+          );
 
 
-    setErrorMessage(
-      ""
-    );
+          if (
+            typeof navigator !==
+              "undefined" &&
+            !navigator.onLine
+          ) {
+
+            setIsOffline(
+              true
+            );
 
 
-  } else {
+            setErrorMessage(
+              ""
+            );
 
-    setErrorMessage(
-      "No pudimos actualizar los recuerdos. Inténtalo nuevamente."
-    );
 
-  }
+          } else {
+
+            setErrorMessage(
+              "No pudimos actualizar los recuerdos. Inténtalo nuevamente."
+            );
+
+          }
 
 
         } finally {
@@ -1301,35 +1359,36 @@ useEffect(
 
 
       const onlineHandler =
-  () => {
+        () => {
 
-    setIsOffline(
-      false
-    );
-
-
-    setErrorMessage(
-      ""
-    );
+          setIsOffline(
+            false
+          );
 
 
-    void loadGallery();
-
-  };
-
-  const offlineHandler =
-  () => {
-
-    setIsOffline(
-      true
-    );
+          setErrorMessage(
+            ""
+          );
 
 
-    setErrorMessage(
-      ""
-    );
+          void loadGallery();
 
-  };
+        };
+
+
+      const offlineHandler =
+        () => {
+
+          setIsOffline(
+            true
+          );
+
+
+          setErrorMessage(
+            ""
+          );
+
+        };
 
 
       const visibilityHandler =
@@ -1359,10 +1418,11 @@ useEffect(
         onlineHandler
       );
 
+
       window.addEventListener(
-  "offline",
-  offlineHandler
-);
+        "offline",
+        offlineHandler
+      );
 
 
       document.addEventListener(
@@ -1389,10 +1449,11 @@ useEffect(
           onlineHandler
         );
 
+
         window.removeEventListener(
-  "offline",
-  offlineHandler
-);
+          "offline",
+          offlineHandler
+        );
 
 
         document.removeEventListener(
@@ -1403,7 +1464,6 @@ useEffect(
       };
 
     },
-
     [
       loadGallery
     ]
@@ -1469,6 +1529,7 @@ useEffect(
 
 
         setNotice({
+
           title:
             "No se pudo actualizar",
 
@@ -1477,6 +1538,7 @@ useEffect(
 
           tone:
             "error"
+
         });
 
 
@@ -1516,7 +1578,7 @@ useEffect(
               current
             ) =>
               current.id ===
-              photo.id
+                photo.id
 
                 ? {
                     ...current,
@@ -1551,6 +1613,7 @@ useEffect(
 
 
           return {
+
             ...previous,
 
             favorite_count:
@@ -1559,6 +1622,7 @@ useEffect(
                 previous.favorite_count -
                   1
               )
+
           };
 
         }
@@ -1605,6 +1669,7 @@ useEffect(
 
 
       setNotice({
+
         title:
           "No se pudo actualizar",
 
@@ -1613,6 +1678,7 @@ useEffect(
 
         tone:
           "error"
+
       });
 
 
@@ -1652,14 +1718,16 @@ useEffect(
             current
           ) =>
             current.id ===
-            photo.id
+              photo.id
 
               ? {
+
                   ...current,
 
                   favorite_count:
                     current.favorite_count +
                     1
+
                 }
 
               : current
@@ -1684,11 +1752,13 @@ useEffect(
 
 
         return {
+
           ...previous,
 
           favorite_count:
             previous.favorite_count +
             1
+
         };
 
       }
@@ -1723,6 +1793,7 @@ useEffect(
 
 
       setNotice({
+
         title:
           "No se pudo guardar",
 
@@ -1731,6 +1802,7 @@ useEffect(
 
         tone:
           "error"
+
       });
 
     }
@@ -1739,7 +1811,7 @@ useEffect(
 
 
   /* =======================================================
-     ELIMINAR
+     ELIMINAR UNA
      ======================================================= */
 
   function requestDeletePhoto(
@@ -1817,8 +1889,11 @@ useEffect(
 
       const response =
         await fetch(
+
           "/api/photos/delete",
+
           {
+
             method:
               "POST",
 
@@ -1834,10 +1909,14 @@ useEffect(
 
             body:
               JSON.stringify({
+
                 id:
                   photo.id
+
               })
+
           }
+
         );
 
 
@@ -1929,6 +2008,28 @@ useEffect(
       );
 
 
+      setDeleteSelectedIds(
+        (
+          previous
+        ) => {
+
+          const next =
+            new Set<string>(
+              previous
+            );
+
+
+          next.delete(
+            photo.id
+          );
+
+
+          return next;
+
+        }
+      );
+
+
       window.dispatchEvent(
         new Event(
           "mis15:gallery-refresh"
@@ -1952,6 +2053,7 @@ useEffect(
 
 
       setNotice({
+
         title:
           "No se pudo eliminar",
 
@@ -1962,6 +2064,7 @@ useEffect(
 
         tone:
           "error"
+
       });
 
 
@@ -1993,7 +2096,7 @@ useEffect(
 
               if (
                 tab ===
-                "mine"
+                  "mine"
               ) {
 
                 return (
@@ -2006,7 +2109,7 @@ useEffect(
 
               if (
                 tab ===
-                "favorites"
+                  "favorites"
               ) {
 
                 return (
@@ -2025,7 +2128,7 @@ useEffect(
 
         if (
           tab ===
-          "favorites"
+            "favorites"
         ) {
 
           return filtered.sort(
@@ -2036,7 +2139,7 @@ useEffect(
 
               if (
                 b.favorite_count !==
-                a.favorite_count
+                  a.favorite_count
               ) {
 
                 return (
@@ -2071,7 +2174,7 @@ useEffect(
 
             if (
               a.is_featured !==
-              b.is_featured
+                b.is_featured
             ) {
 
               return (
@@ -2111,13 +2214,23 @@ useEffect(
 
 
   /* =======================================================
-     SELECCIÓN
+     DESCARGA - MODO SELECCIÓN
      ======================================================= */
 
   function startSelectionMode() {
 
     setSelectionMode(
       true
+    );
+
+
+    setDeleteMode(
+      false
+    );
+
+
+    setDeleteSelectedIds(
+      new Set<string>()
     );
 
 
@@ -2228,322 +2341,154 @@ useEffect(
       ]
     );
 
-    const selectedOwnPhotos =
-  useMemo(
 
-    () =>
-      selectedPhotos.filter(
-        (
-          photo
-        ) =>
-          photo.owner_id ===
-          userId
-      ),
+  /* =======================================================
+     ELIMINACIÓN - MODO EXCLUSIVO
+     ======================================================= */
 
-    [
-      selectedPhotos,
-      userId
-    ]
+  const ownVisiblePhotos =
+    useMemo(
 
-  );
-
-
-const selectedContainsForeignPhotos =
-  selectedPhotos.some(
-    (
-      photo
-    ) =>
-      photo.owner_id !==
-      userId
-  );
-
-
-const canDeleteSelected =
-  selectedPhotos.length >
-    0 &&
-  !selectedContainsForeignPhotos;
-
-/* =======================================================
-   ELIMINACIÓN MÚLTIPLE
-   ======================================================= */
-
-function requestBulkDelete() {
-
-  if (
-    selectedPhotos.length ===
-    0
-  ) {
-
-    return;
-
-  }
-
-
-  /*
-   * Seguridad adicional.
-   * Aunque el botón esté deshabilitado,
-   * verificamos otra vez aquí.
-   */
-
-  if (
-    selectedContainsForeignPhotos
-  ) {
-
-    setNotice({
-
-      title:
-        "Selección no válida",
-
-      message:
-        "Solo puedes eliminar las fotografías que tú compartiste.",
-
-      tone:
-        "info"
-
-    });
-
-
-    return;
-
-  }
-
-
-  setPendingDeletePhotos(
-    [
-      ...selectedOwnPhotos
-    ]
-  );
-
-
-  setBulkDeleteCurrent(
-    0
-  );
-
-
-  setBulkDeleteTotal(
-    selectedOwnPhotos.length
-  );
-
-
-  setBulkDeleteError(
-    ""
-  );
-
-
-  setBulkDeleteStatus(
-    "confirm"
-  );
-
-}
-
-
-function cancelBulkDeleteConfirmation() {
-
-  setPendingDeletePhotos(
-    []
-  );
-
-
-  setBulkDeleteCurrent(
-    0
-  );
-
-
-  setBulkDeleteTotal(
-    0
-  );
-
-
-  setBulkDeleteError(
-    ""
-  );
-
-
-  setBulkDeleteStatus(
-    "idle"
-  );
-
-}
-
-
-async function confirmBulkDelete() {
-
-  const targetPhotos =
-    [
-      ...pendingDeletePhotos
-    ];
-
-
-  if (
-    targetPhotos.length ===
-    0
-  ) {
-
-    setBulkDeleteStatus(
-      "idle"
-    );
-
-
-    return;
-
-  }
-
-
-  setBulkDeleteStatus(
-    "running"
-  );
-
-
-  setBulkDeleteCurrent(
-    0
-  );
-
-
-  setBulkDeleteTotal(
-    targetPhotos.length
-  );
-
-
-  setBulkDeleteError(
-    ""
-  );
-
-
-  const deletedIds =
-    new Set<string>();
-
-
-  try {
-
-    const token =
-      await getAccessToken();
-
-
-    if (
-      !token
-    ) {
-
-      throw new Error(
-        "No se pudo validar tu sesión."
-      );
-
-    }
-
-
-    for (
-      let index = 0;
-      index <
-        targetPhotos.length;
-      index += 1
-    ) {
-
-      const photo =
-        targetPhotos[index];
-
-
-      /*
-       * Verificación adicional antes
-       * de cada eliminación.
-       */
-
-      if (
-        photo.owner_id !==
-        userId
-      ) {
-
-        throw new Error(
-          "La selección contiene una fotografía que no te pertenece."
-        );
-
-      }
-
-
-      const response =
-        await fetch(
-
-          "/api/photos/delete",
-
-          {
-
-            method:
-              "POST",
-
-            headers: {
-
-              Authorization:
-                `Bearer ${token}`,
-
-              "Content-Type":
-                "application/json"
-
-            },
-
-            body:
-              JSON.stringify({
-
-                id:
-                  photo.id
-
-              })
-
-          }
-
-        );
-
-
-      const body =
-        await response
-          .json()
-          .catch(
-            () => null
-          );
-
-
-      if (
-        !response.ok
-      ) {
-
-        throw new Error(
-          body?.error ??
-          "No se pudo eliminar una de las fotografías."
-        );
-
-      }
-
-
-      deletedIds.add(
-        photo.id
-      );
-
-
-      setBulkDeleteCurrent(
-        index +
-        1
-      );
-
-    }
-
-
-    /*
-     * Actualizar inmediatamente la interfaz.
-     */
-
-    setPhotos(
-      (
-        previous
-      ) =>
-        previous.filter(
+      () =>
+        visiblePhotos.filter(
           (
             photo
           ) =>
-            !deletedIds.has(
-              photo.id
-            )
-        )
+            photo.owner_id ===
+            userId
+        ),
+
+      [
+        visiblePhotos,
+        userId
+      ]
     );
 
 
-    setFavoriteIds(
+  const deleteSelectedPhotos =
+    useMemo(
+
+      () =>
+        ownVisiblePhotos.filter(
+          (
+            photo
+          ) =>
+            deleteSelectedIds.has(
+              photo.id
+            )
+        ),
+
+      [
+        ownVisiblePhotos,
+        deleteSelectedIds
+      ]
+    );
+
+    /*
+ * =======================================================
+ * FOTOS QUE SE MOSTRARÁN REALMENTE
+ * =======================================================
+ *
+ * En modo normal:
+ * mostramos visiblePhotos.
+ *
+ * En modo eliminar:
+ * mostramos exclusivamente fotografías
+ * pertenecientes al usuario actual.
+ */
+
+const galleryPhotos =
+  deleteMode
+    ? ownVisiblePhotos
+    : visiblePhotos;
+
+
+function startDeleteMode() {
+
+  /*
+   * El modo eliminación pertenece exclusivamente
+   * a "Mis fotos".
+   *
+   * Aunque en el futuro movamos el botón,
+   * al pulsarlo siempre llevamos al usuario
+   * a sus propias fotografías.
+   */
+
+  setTab(
+    "mine"
+  );
+
+
+  setDeleteMode(
+    true
+  );
+
+
+  /*
+   * Nunca permitimos tener simultáneamente
+   * modo descarga y modo eliminación.
+   */
+
+  setSelectionMode(
+    false
+  );
+
+
+  setSelectedIds(
+    new Set<string>()
+  );
+
+
+  /*
+   * Empezamos sin fotografías marcadas.
+   */
+
+  setDeleteSelectedIds(
+    new Set<string>()
+  );
+
+
+  setOpenPhoto(
+    null
+  );
+
+}
+
+
+  function cancelDeleteMode() {
+
+    setDeleteMode(
+      false
+    );
+
+
+    setDeleteSelectedIds(
+      new Set<string>()
+    );
+
+  }
+
+
+  function toggleDeleteSelection(
+    photo: Photo
+  ) {
+
+    /*
+     * Las fotografías ajenas nunca
+     * pueden seleccionarse en este modo.
+     */
+
+    if (
+      photo.owner_id !==
+      userId
+    ) {
+
+      return;
+
+    }
+
+
+    setDeleteSelectedIds(
       (
         previous
       ) => {
@@ -2554,14 +2499,23 @@ async function confirmBulkDelete() {
           );
 
 
-        deletedIds.forEach(
-          (
-            id
-          ) =>
-            next.delete(
-              id
-            )
-        );
+        if (
+          next.has(
+            photo.id
+          )
+        ) {
+
+          next.delete(
+            photo.id
+          );
+
+        } else {
+
+          next.add(
+            photo.id
+          );
+
+        }
 
 
         return next;
@@ -2569,48 +2523,258 @@ async function confirmBulkDelete() {
       }
     );
 
+  }
 
-    setSelectedIds(
+
+  function selectAllOwnVisible() {
+
+    setDeleteSelectedIds(
+      new Set<string>(
+        ownVisiblePhotos.map(
+          (
+            photo
+          ) =>
+            photo.id
+        )
+      )
+    );
+
+  }
+
+
+  function clearDeleteSelection() {
+
+    setDeleteSelectedIds(
       new Set<string>()
     );
 
+  }
 
-    setSelectionMode(
-      false
+
+  function requestBulkDelete() {
+
+    if (
+      deleteSelectedPhotos.length ===
+      0
+    ) {
+
+      return;
+
+    }
+
+
+    setPendingDeletePhotos(
+      [
+        ...deleteSelectedPhotos
+      ]
+    );
+
+
+    setBulkDeleteCurrent(
+      0
+    );
+
+
+    setBulkDeleteTotal(
+      deleteSelectedPhotos.length
+    );
+
+
+    setBulkDeleteError(
+      ""
     );
 
 
     setBulkDeleteStatus(
-      "completed"
+      "confirm"
+    );
+
+  }
+
+
+  function cancelBulkDeleteConfirmation() {
+
+    setPendingDeletePhotos(
+      []
     );
 
 
-    window.dispatchEvent(
-      new Event(
-        "mis15:gallery-refresh"
-      )
+    setBulkDeleteCurrent(
+      0
     );
 
 
-  } catch (
-    error
-  ) {
-
-    console.error(
-      "Error eliminando fotografías:",
-      error
+    setBulkDeleteTotal(
+      0
     );
 
 
-    /*
-     * Las que sí alcanzaron a eliminarse
-     * desaparecen igualmente de la interfaz.
-     */
+    setBulkDeleteError(
+      ""
+    );
+
+
+    setBulkDeleteStatus(
+      "idle"
+    );
+
+  }
+
+
+  async function confirmBulkDelete() {
+
+    const targetPhotos =
+      [
+        ...pendingDeletePhotos
+      ];
+
 
     if (
-      deletedIds.size >
+      targetPhotos.length ===
       0
     ) {
+
+      setBulkDeleteStatus(
+        "idle"
+      );
+
+
+      return;
+
+    }
+
+
+    setBulkDeleteStatus(
+      "running"
+    );
+
+
+    setBulkDeleteCurrent(
+      0
+    );
+
+
+    setBulkDeleteTotal(
+      targetPhotos.length
+    );
+
+
+    setBulkDeleteError(
+      ""
+    );
+
+
+    const deletedIds =
+      new Set<string>();
+
+
+    try {
+
+      const token =
+        await getAccessToken();
+
+
+      if (
+        !token
+      ) {
+
+        throw new Error(
+          "No se pudo validar tu sesión."
+        );
+
+      }
+
+
+      for (
+        let index = 0;
+        index <
+          targetPhotos.length;
+        index += 1
+      ) {
+
+        const photo =
+          targetPhotos[
+            index
+          ];
+
+
+        if (
+          photo.owner_id !==
+          userId
+        ) {
+
+          throw new Error(
+            "Una de las fotografías seleccionadas no te pertenece."
+          );
+
+        }
+
+
+        const response =
+          await fetch(
+
+            "/api/photos/delete",
+
+            {
+
+              method:
+                "POST",
+
+              headers: {
+
+                Authorization:
+                  `Bearer ${token}`,
+
+                "Content-Type":
+                  "application/json"
+
+              },
+
+              body:
+                JSON.stringify({
+
+                  id:
+                    photo.id
+
+                })
+
+            }
+
+          );
+
+
+        const body =
+          await response
+            .json()
+            .catch(
+              () => null
+            );
+
+
+        if (
+          !response.ok
+        ) {
+
+          throw new Error(
+            body?.error ??
+            "No se pudo eliminar una de las fotografías."
+          );
+
+        }
+
+
+        deletedIds.add(
+          photo.id
+        );
+
+
+        setBulkDeleteCurrent(
+          index +
+          1
+        );
+
+      }
+
 
       setPhotos(
         (
@@ -2627,7 +2791,7 @@ async function confirmBulkDelete() {
       );
 
 
-      setSelectedIds(
+      setFavoriteIds(
         (
           previous
         ) => {
@@ -2641,10 +2805,13 @@ async function confirmBulkDelete() {
           deletedIds.forEach(
             (
               id
-            ) =>
+            ) => {
+
               next.delete(
                 id
-              )
+              );
+
+            }
           );
 
 
@@ -2653,62 +2820,145 @@ async function confirmBulkDelete() {
         }
       );
 
+
+      setDeleteSelectedIds(
+        new Set<string>()
+      );
+
+
+      setDeleteMode(
+        false
+      );
+
+
+      setBulkDeleteStatus(
+        "completed"
+      );
+
+
+      window.dispatchEvent(
+        new Event(
+          "mis15:gallery-refresh"
+        )
+      );
+
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        "Error eliminando fotografías:",
+        error
+      );
+
+
+      if (
+        deletedIds.size >
+        0
+      ) {
+
+        setPhotos(
+          (
+            previous
+          ) =>
+            previous.filter(
+              (
+                photo
+              ) =>
+                !deletedIds.has(
+                  photo.id
+                )
+            )
+        );
+
+
+        setDeleteSelectedIds(
+          (
+            previous
+          ) => {
+
+            const next =
+              new Set<string>(
+                previous
+              );
+
+
+            deletedIds.forEach(
+              (
+                id
+              ) => {
+
+                next.delete(
+                  id
+                );
+
+              }
+            );
+
+
+            return next;
+
+          }
+        );
+
+      }
+
+
+      setBulkDeleteError(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron eliminar todas las fotografías."
+      );
+
+
+      setBulkDeleteStatus(
+        "error"
+      );
+
+    }
+
+  }
+
+
+  function closeBulkDeleteModal() {
+
+    if (
+      bulkDeleteStatus ===
+      "running"
+    ) {
+
+      return;
+
     }
 
 
+    setPendingDeletePhotos(
+      []
+    );
+
+
+    setBulkDeleteCurrent(
+      0
+    );
+
+
+    setBulkDeleteTotal(
+      0
+    );
+
+
     setBulkDeleteError(
-      error instanceof Error
-        ? error.message
-        : "No se pudieron eliminar todas las fotografías."
+      ""
     );
 
 
     setBulkDeleteStatus(
-      "error"
+      "idle"
     );
 
   }
 
-}
-
-
-function closeBulkDeleteModal() {
-
-  if (
-    bulkDeleteStatus ===
-    "running"
-  ) {
-
-    return;
-
-  }
-
-
-  setPendingDeletePhotos(
-    []
-  );
-
-
-  setBulkDeleteCurrent(
-    0
-  );
-
-
-  setBulkDeleteTotal(
-    0
-  );
-
-
-  setBulkDeleteError(
-    ""
-  );
-
-
-  setBulkDeleteStatus(
-    "idle"
-  );
-
-}
 
   /* =======================================================
      DESCARGA MASIVA
@@ -2783,85 +3033,154 @@ function closeBulkDeleteModal() {
 
   async function confirmBulkDownload() {
 
-  const targetPhotos =
-    [
-      ...pendingDownloadPhotos
-    ];
+    const targetPhotos =
+      [
+        ...pendingDownloadPhotos
+      ];
 
 
-  if (
-    targetPhotos.length ===
-    0
-  ) {
+    if (
+      targetPhotos.length ===
+      0
+    ) {
 
-    setDownloadStatus(
-      "idle"
+      setDownloadStatus(
+        "idle"
+      );
+
+
+      return;
+
+    }
+
+
+    cancelDownloadRef.current =
+      false;
+
+
+    setDownloadCurrent(
+      0
     );
 
 
-    return;
-
-  }
-
-
-  cancelDownloadRef.current =
-    false;
+    setDownloadTotal(
+      targetPhotos.length
+    );
 
 
-  setDownloadCurrent(
-    0
-  );
+    setDownloadError(
+      ""
+    );
 
 
-  setDownloadTotal(
-    targetPhotos.length
-  );
+    setDownloadStatus(
+      "running"
+    );
 
 
-  setDownloadError(
-    ""
-  );
+    /*
+     * IPHONE / IPAD
+     */
+
+    if (
+      isIOSDevice() &&
+      typeof navigator.share ===
+        "function" &&
+      typeof navigator.canShare ===
+        "function"
+    ) {
+
+      try {
+
+        const files:
+          File[] = [];
 
 
-  setDownloadStatus(
-    "running"
-  );
+        for (
+          let index = 0;
+          index <
+            targetPhotos.length;
+          index += 1
+        ) {
+
+          if (
+            cancelDownloadRef.current
+          ) {
+
+            setDownloadStatus(
+              "cancelled"
+            );
 
 
-  /*
-   * =====================================================
-   * IPHONE / IPAD
-   * =====================================================
-   *
-   * En iOS evitamos múltiples descargas del navegador.
-   *
-   * Preparamos todas las imágenes y abrimos UNA VEZ
-   * el menú nativo del sistema.
-   */
+            return;
 
-  if (
-    isIOSDevice() &&
-    typeof navigator.share ===
-      "function" &&
-    typeof navigator.canShare ===
-      "function"
-  ) {
-
-    try {
-
-      const files:
-        File[] = [];
+          }
 
 
-      for (
-        let index = 0;
-        index <
-          targetPhotos.length;
-        index += 1
+          const file =
+            await photoToFile(
+              targetPhotos[
+                index
+              ]
+            );
+
+
+          files.push(
+            file
+          );
+
+
+          setDownloadCurrent(
+            index +
+            1
+          );
+
+        }
+
+
+        const canShareFiles =
+          navigator.canShare({
+            files
+          });
+
+
+        if (
+          !canShareFiles
+        ) {
+
+          throw new Error(
+            "El dispositivo no permite compartir este conjunto de fotografías."
+          );
+
+        }
+
+
+        await navigator.share({
+
+          files,
+
+          title:
+            "Recuerdos de los 15 de Fernanda"
+
+        });
+
+
+        setDownloadStatus(
+          "completed"
+        );
+
+
+        return;
+
+
+      } catch (
+        error
       ) {
 
         if (
-          cancelDownloadRef.current
+          error instanceof DOMException &&
+          error.name ===
+            "AbortError"
         ) {
 
           setDownloadStatus(
@@ -2874,82 +3193,110 @@ function closeBulkDeleteModal() {
         }
 
 
-        const file =
-          await photoToFile(
-            targetPhotos[index]
+        console.error(
+          "Error compartiendo fotografías en iOS:",
+          error
+        );
+
+
+        setDownloadError(
+          "No fue posible preparar todas las fotografías para guardarlas."
+        );
+
+
+        setDownloadStatus(
+          "error"
+        );
+
+
+        return;
+
+      }
+
+    }
+
+
+    /*
+     * PC / OTROS
+     */
+
+    let downloaded =
+      0;
+
+
+    try {
+
+      for (
+        let batchStart = 0;
+        batchStart <
+          targetPhotos.length;
+        batchStart +=
+          DOWNLOAD_BATCH_SIZE
+      ) {
+
+        if (
+          cancelDownloadRef.current
+        ) {
+
+          break;
+
+        }
+
+
+        const batch =
+          targetPhotos.slice(
+            batchStart,
+            batchStart +
+              DOWNLOAD_BATCH_SIZE
           );
 
 
-        files.push(
-          file
-        );
+        for (
+          const photo of
+          batch
+        ) {
+
+          if (
+            cancelDownloadRef.current
+          ) {
+
+            break;
+
+          }
 
 
-        setDownloadCurrent(
-          index +
-          1
-        );
+          const file =
+            await photoToFile(
+              photo
+            );
+
+
+          downloadBlob(
+            file,
+            file.name
+          );
+
+
+          downloaded +=
+            1;
+
+
+          setDownloadCurrent(
+            downloaded
+          );
+
+
+          await delay(
+            300
+          );
+
+        }
 
       }
 
 
-      const canShareFiles =
-        navigator.canShare({
-          files
-        });
-
-
       if (
-        !canShareFiles
-      ) {
-
-        throw new Error(
-          "El dispositivo no permite compartir este conjunto de fotografías."
-        );
-
-      }
-
-
-      /*
-       * IMPORTANTE:
-       *
-       * Esta es una sola interacción nativa.
-       *
-       * En iPhone aparecerá el menú donde
-       * puede elegirse Guardar imágenes.
-       */
-
-      await navigator.share({
-
-        files,
-
-        title:
-          "Recuerdos de los 15 de Fernanda"
-
-      });
-
-
-      setDownloadStatus(
-        "completed"
-      );
-
-
-      return;
-
-
-    } catch (
-      error
-    ) {
-
-      /*
-       * El usuario cerró voluntariamente
-       * el menú de compartir.
-       */
-
-      if (
-        error instanceof DOMException &&
-        error.name ===
-          "AbortError"
+        cancelDownloadRef.current
       ) {
 
         setDownloadStatus(
@@ -2962,14 +3309,25 @@ function closeBulkDeleteModal() {
       }
 
 
+      setDownloadStatus(
+        "completed"
+      );
+
+
+    } catch (
+      error
+    ) {
+
       console.error(
-        "Error compartiendo fotografías en iOS:",
+        "Error descargando fotografías:",
         error
       );
 
 
       setDownloadError(
-        "No fue posible preparar todas las fotografías para guardarlas."
+        error instanceof Error
+          ? error.message
+          : "No se pudieron descargar todas las fotografías."
       );
 
 
@@ -2977,138 +3335,9 @@ function closeBulkDeleteModal() {
         "error"
       );
 
-
-      return;
-
     }
 
   }
-
-
-  /*
-   * =====================================================
-   * PC / OTROS DISPOSITIVOS
-   * =====================================================
-   */
-
-  let downloaded =
-    0;
-
-
-  try {
-
-    for (
-      let batchStart = 0;
-      batchStart <
-        targetPhotos.length;
-      batchStart +=
-        DOWNLOAD_BATCH_SIZE
-    ) {
-
-      if (
-        cancelDownloadRef.current
-      ) {
-
-        break;
-
-      }
-
-
-      const batch =
-        targetPhotos.slice(
-          batchStart,
-          batchStart +
-            DOWNLOAD_BATCH_SIZE
-        );
-
-
-      for (
-        const photo of
-        batch
-      ) {
-
-        if (
-          cancelDownloadRef.current
-        ) {
-
-          break;
-
-        }
-
-
-        const file =
-          await photoToFile(
-            photo
-          );
-
-
-        downloadBlob(
-          file,
-          file.name
-        );
-
-
-        downloaded +=
-          1;
-
-
-        setDownloadCurrent(
-          downloaded
-        );
-
-
-        await delay(
-          300
-        );
-
-      }
-
-    }
-
-
-    if (
-      cancelDownloadRef.current
-    ) {
-
-      setDownloadStatus(
-        "cancelled"
-      );
-
-
-      return;
-
-    }
-
-
-    setDownloadStatus(
-      "completed"
-    );
-
-
-  } catch (
-    error
-  ) {
-
-    console.error(
-      "Error descargando fotografías:",
-      error
-    );
-
-
-    setDownloadError(
-      error instanceof Error
-        ? error.message
-        : "No se pudieron descargar todas las fotografías."
-    );
-
-
-    setDownloadStatus(
-      "error"
-    );
-
-  }
-
-}
 
 
   function cancelBulkDownload() {
@@ -3160,14 +3389,29 @@ function closeBulkDeleteModal() {
 
   const downloadPercentage =
     downloadTotal >
-    0
+      0
 
       ? Math.round(
           (
             downloadCurrent /
             downloadTotal
           ) *
-            100
+          100
+        )
+
+      : 0;
+
+
+  const bulkDeletePercentage =
+    bulkDeleteTotal >
+      0
+
+      ? Math.round(
+          (
+            bulkDeleteCurrent /
+            bulkDeleteTotal
+          ) *
+          100
         )
 
       : 0;
@@ -3205,7 +3449,7 @@ function closeBulkDeleteModal() {
 
     const previousIndex =
       currentPhotoIndex <=
-      0
+        0
 
         ? visiblePhotos.length -
           1
@@ -3237,8 +3481,8 @@ function closeBulkDeleteModal() {
 
     const nextIndex =
       currentPhotoIndex >=
-      visiblePhotos.length -
-        1
+        visiblePhotos.length -
+          1
 
         ? 0
 
@@ -3254,94 +3498,98 @@ function closeBulkDeleteModal() {
 
   }
 
-  /* =======================================================
-   PRECARGAR FOTO ANTERIOR Y SIGUIENTE
-   ======================================================= */
 
+  /* =======================================================
+     PRECARGAR ANTERIOR Y SIGUIENTE
+     ======================================================= */
 
   useEffect(
-  () => {
+    () => {
 
-    if (
-      !openPhoto ||
-      visiblePhotos.length <=
-        1
-    ) {
-
-      return;
-
-    }
-
-
-    const previousIndex =
-      currentPhotoIndex <=
-        0
-        ? visiblePhotos.length -
+      if (
+        !openPhoto ||
+        visiblePhotos.length <=
           1
-        : currentPhotoIndex -
-          1;
+      ) {
+
+        return;
+
+      }
 
 
-    const nextIndex =
-      currentPhotoIndex >=
-        visiblePhotos.length -
-          1
-        ? 0
-        : currentPhotoIndex +
-          1;
+      const previousIndex =
+        currentPhotoIndex <=
+          0
+
+          ? visiblePhotos.length -
+            1
+
+          : currentPhotoIndex -
+            1;
 
 
-    const previousPhoto =
-      visiblePhotos[
-        previousIndex
-      ];
+      const nextIndex =
+        currentPhotoIndex >=
+          visiblePhotos.length -
+            1
+
+          ? 0
+
+          : currentPhotoIndex +
+            1;
 
 
-    const nextPhoto =
-      visiblePhotos[
-        nextIndex
-      ];
+      const previousPhoto =
+        visiblePhotos[
+          previousIndex
+        ];
 
 
-    if (
-      previousPhoto
-    ) {
-
-      const previousImage =
-        new Image();
+      const nextPhoto =
+        visiblePhotos[
+          nextIndex
+        ];
 
 
-      previousImage.src =
-        getViewerUrl(
-          previousPhoto.secure_url
-        );
+      if (
+        previousPhoto
+      ) {
 
-    }
-
-
-    if (
-      nextPhoto
-    ) {
-
-      const nextImage =
-        new Image();
+        const previousImage =
+          new Image();
 
 
-      nextImage.src =
-        getViewerUrl(
-          nextPhoto.secure_url
-        );
+        previousImage.src =
+          getViewerUrl(
+            previousPhoto.secure_url
+          );
 
-    }
+      }
 
-  },
 
-  [
-    openPhoto?.id,
-    currentPhotoIndex,
-    visiblePhotos
-  ]
-);
+      if (
+        nextPhoto
+      ) {
+
+        const nextImage =
+          new Image();
+
+
+        nextImage.src =
+          getViewerUrl(
+            nextPhoto.secure_url
+          );
+
+      }
+
+    },
+    [
+      openPhoto?.id,
+      currentPhotoIndex,
+      visiblePhotos
+    ]
+  );
+
 
   /* =======================================================
      TECLADO
@@ -3355,6 +3603,8 @@ function closeBulkDeleteModal() {
         deleteCandidate ||
         notice ||
         downloadStatus !==
+          "idle" ||
+        bulkDeleteStatus !==
           "idle"
       ) {
 
@@ -3422,6 +3672,7 @@ function closeBulkDeleteModal() {
       deleteCandidate,
       notice,
       downloadStatus,
+      bulkDeleteStatus,
       currentPhotoIndex,
       visiblePhotos
     ]
@@ -3532,14 +3783,17 @@ function closeBulkDeleteModal() {
               text-[#82697d]
             "
           >
+
             {photos.length}
             {" "}
+
             {
               photos.length ===
                 1
                 ? "foto compartida"
                 : "fotos compartidas"
             }
+
           </p>
 
         </div>
@@ -3548,7 +3802,8 @@ function closeBulkDeleteModal() {
         {
           visiblePhotos.length >
             0 &&
-          !selectionMode && (
+          !selectionMode &&
+          !deleteMode && (
 
             <div
               className="
@@ -3589,6 +3844,46 @@ function closeBulkDeleteModal() {
                 Seleccionar
 
               </button>
+
+
+              {
+                ownVisiblePhotos.length >
+                  0 && (
+
+                  <button
+                    type="button"
+                    onClick={
+                      startDeleteMode
+                    }
+                    className="
+                      flex
+                      min-h-11
+                      items-center
+                      gap-2
+                      rounded-full
+                      bg-[#f7e4e8]
+                      px-4
+                      text-sm
+                      font-semibold
+                      text-[#a4405c]
+                      shadow
+                      transition-all
+                      duration-200
+                      hover:scale-105
+                      hover:bg-red-100
+                    "
+                  >
+
+                    <Trash2
+                      size={18}
+                    />
+
+                    Eliminar fotos
+
+                  </button>
+
+                )
+              }
 
 
               <button
@@ -3633,35 +3928,41 @@ function closeBulkDeleteModal() {
 
       </div>
 
-{
-  isOffline && (
 
-    <div
-      className="
-        mb-4
-        rounded-2xl
-        border
-        border-[#ead9ba]
-        bg-[#fff8e9]
-        px-4
-        py-3
-        text-sm
-        leading-6
-        text-[#806333]
-      "
-    >
-      <strong>
-        Sin conexión.
-      </strong>
-      {" "}
-      Puedes seguir viendo los recuerdos ya cargados.
-      Las nuevas fotos pendientes se compartirán
-      automáticamente cuando vuelva internet.
-    </div>
+      {/* SIN CONEXIÓN */}
 
-  )
-}
+      {
+        isOffline && (
 
+          <div
+            className="
+              mb-4
+              rounded-2xl
+              border
+              border-[#ead9ba]
+              bg-[#fff8e9]
+              px-4
+              py-3
+              text-sm
+              leading-6
+              text-[#806333]
+            "
+          >
+
+            <strong>
+              Sin conexión.
+            </strong>
+
+            {" "}
+
+            Puedes seguir viendo los recuerdos ya cargados.
+            Las nuevas fotos pendientes se compartirán
+            automáticamente cuando vuelva internet.
+
+          </div>
+
+        )
+      }
 
 
       {/* ERROR GENERAL */}
@@ -3735,7 +4036,11 @@ function closeBulkDeleteModal() {
                 "all"
               );
 
+
               cancelSelectionMode();
+
+
+              cancelDeleteMode();
 
             }
           }
@@ -3747,7 +4052,6 @@ function closeBulkDeleteModal() {
             font-semibold
             transition-all
             duration-200
-            hover:scale-[1.02]
             sm:text-sm
 
             ${
@@ -3770,7 +4074,11 @@ function closeBulkDeleteModal() {
                 "favorites"
               );
 
+
               cancelSelectionMode();
+
+
+              cancelDeleteMode();
 
             }
           }
@@ -3782,7 +4090,6 @@ function closeBulkDeleteModal() {
             font-semibold
             transition-all
             duration-200
-            hover:scale-[1.02]
             sm:text-sm
 
             ${
@@ -3805,7 +4112,11 @@ function closeBulkDeleteModal() {
                 "mine"
               );
 
+
               cancelSelectionMode();
+
+
+              cancelDeleteMode();
 
             }
           }
@@ -3817,7 +4128,6 @@ function closeBulkDeleteModal() {
             font-semibold
             transition-all
             duration-200
-            hover:scale-[1.02]
             sm:text-sm
 
             ${
@@ -3833,7 +4143,9 @@ function closeBulkDeleteModal() {
       </div>
 
 
-      {/* SELECCIÓN */}
+      {/* ===================================================
+          BARRA DE DESCARGA
+      ==================================================== */}
 
       {
         selectionMode && (
@@ -3854,150 +4166,327 @@ function closeBulkDeleteModal() {
             "
           >
 
+            <p
+              className="
+                font-semibold
+                text-[#543550]
+              "
+            >
+              {selectedIds.size}
+              {" "}
+              {
+                selectedIds.size ===
+                  1
+                  ? "foto seleccionada"
+                  : "fotos seleccionadas"
+              }
+            </p>
+
+
+            <p
+              className="
+                mt-1
+                text-xs
+                text-[#8b7284]
+              "
+            >
+              Selecciona los recuerdos que deseas guardar.
+            </p>
+
+
             <div
               className="
+                mt-3
                 flex
                 flex-wrap
-                items-center
-                justify-between
-                gap-3
+                gap-2
               "
             >
 
-              <div>
+              <button
+                type="button"
+                onClick={
+                  selectAllVisible
+                }
+                className="
+                  min-h-10
+                  rounded-full
+                  border
+                  border-[#d7c4d5]
+                  bg-white
+                  px-4
+                  text-sm
+                  font-semibold
+                  text-[#765071]
+                "
+              >
+                Seleccionar todas
+              </button>
 
-                <p
-                  className="
-                    font-semibold
-                    text-[#543550]
-                  "
-                >
-                  {selectedIds.size}
-                  {" "}
-                  {
-                    selectedIds.size ===
-                      1
-                      ? "foto seleccionada"
-                      : "fotos seleccionadas"
-                  }
-                </p>
 
-              </div>
+              {
+                selectedIds.size >
+                  0 && (
+
+                  <button
+                    type="button"
+                    onClick={
+                      clearSelection
+                    }
+                    className="
+                      min-h-10
+                      rounded-full
+                      border
+                      border-[#d7c4d5]
+                      bg-white
+                      px-4
+                      text-sm
+                      font-semibold
+                      text-[#765071]
+                    "
+                  >
+                    Quitar selección
+                  </button>
+
+                )
+              }
 
 
-              <div
+              <button
+                type="button"
+                disabled={
+                  selectedPhotos.length ===
+                  0
+                }
+                onClick={
+                  () =>
+                    requestBulkDownload(
+                      selectedPhotos
+                    )
+                }
                 className="
                   flex
-                  flex-wrap
+                  min-h-10
+                  items-center
                   gap-2
+                  rounded-full
+                  bg-[#765071]
+                  px-4
+                  text-sm
+                  font-semibold
+                  text-white
+                  shadow
+                  disabled:opacity-50
                 "
               >
 
-                <button
-                  type="button"
-                  onClick={
-                    selectAllVisible
-                  }
-                  className="
-                    min-h-10
-                    rounded-full
-                    border
-                    border-[#d7c4d5]
-                    bg-white
-                    px-4
-                    text-sm
-                    font-semibold
-                    text-[#765071]
-                  "
-                >
-                  Seleccionar todas
-                </button>
+                <Download
+                  size={17}
+                />
+
+                Guardar seleccionadas
+
+              </button>
 
 
-                {
-                  selectedIds.size >
-                    0 && (
-
-                    <button
-                      type="button"
-                      onClick={
-                        clearSelection
-                      }
-                      className="
-                        min-h-10
-                        rounded-full
-                        border
-                        border-[#d7c4d5]
-                        bg-white
-                        px-4
-                        text-sm
-                        font-semibold
-                        text-[#765071]
-                      "
-                    >
-                      Quitar selección
-                    </button>
-
-                  )
+              <button
+                type="button"
+                onClick={
+                  cancelSelectionMode
                 }
+                className="
+                  min-h-10
+                  rounded-full
+                  bg-[#f7e4e8]
+                  px-4
+                  text-sm
+                  font-semibold
+                  text-[#a4405c]
+                "
+              >
+                Cancelar
+              </button>
+
+            </div>
+
+          </div>
+
+        )
+      }
 
 
-                <button
-                  type="button"
-                  disabled={
-                    selectedPhotos.length ===
-                    0
-                  }
-                  onClick={
-                    () =>
-                      requestBulkDownload(
-                        selectedPhotos
-                      )
-                  }
-                  className="
-                    flex
-                    min-h-10
-                    items-center
-                    gap-2
-                    rounded-full
-                    bg-[#765071]
-                    px-4
-                    text-sm
-                    font-semibold
-                    text-white
-                    shadow
-                    disabled:opacity-50
-                  "
-                >
+      {/* ===================================================
+          BARRA MODO ELIMINAR
+      ==================================================== */}
 
-                  <Download
-                    size={17}
-                  />
+      {
+        deleteMode && (
 
-                  Guardar seleccionadas
+          <div
+            className="
+              sticky
+              top-[68px]
+              z-20
+              mb-5
+              rounded-2xl
+              border
+              border-red-200
+              bg-white/95
+              p-3
+              shadow-xl
+              backdrop-blur
+            "
+          >
 
-                </button>
+            <p
+              className="
+                font-semibold
+                text-[#543550]
+              "
+            >
+
+              {deleteSelectedIds.size}
+              {" "}
+
+              {
+                deleteSelectedIds.size ===
+                  1
+                  ? "foto para eliminar"
+                  : "fotos para eliminar"
+              }
+
+            </p>
 
 
-                <button
-                  type="button"
-                  onClick={
-                    cancelSelectionMode
-                  }
-                  className="
-                    min-h-10
-                    rounded-full
-                    bg-[#f7e4e8]
-                    px-4
-                    text-sm
-                    font-semibold
-                    text-[#a4405c]
-                  "
-                >
-                  Cancelar
-                </button>
+            <p
+              className="
+                mt-1
+                text-xs
+                leading-5
+                text-[#8b7284]
+              "
+            >
+              Solo puedes seleccionar las fotografías que tú compartiste.
+            </p>
 
-              </div>
+
+            <div
+              className="
+                mt-3
+                flex
+                flex-wrap
+                gap-2
+              "
+            >
+
+              <button
+                type="button"
+                onClick={
+                  selectAllOwnVisible
+                }
+                disabled={
+                  ownVisiblePhotos.length ===
+                  0
+                }
+                className="
+                  min-h-10
+                  rounded-full
+                  border
+                  border-red-200
+                  bg-white
+                  px-4
+                  text-sm
+                  font-semibold
+                  text-[#a4405c]
+                  disabled:opacity-50
+                "
+              >
+                Seleccionar mis fotos
+              </button>
+
+
+              {
+                deleteSelectedIds.size >
+                  0 && (
+
+                  <button
+                    type="button"
+                    onClick={
+                      clearDeleteSelection
+                    }
+                    className="
+                      min-h-10
+                      rounded-full
+                      border
+                      border-[#d7c4d5]
+                      bg-white
+                      px-4
+                      text-sm
+                      font-semibold
+                      text-[#765071]
+                    "
+                  >
+                    Quitar selección
+                  </button>
+
+                )
+              }
+
+
+              <button
+                type="button"
+                disabled={
+                  deleteSelectedPhotos.length ===
+                  0
+                }
+                onClick={
+                  requestBulkDelete
+                }
+                className="
+                  flex
+                  min-h-10
+                  items-center
+                  gap-2
+                  rounded-full
+                  bg-red-600
+                  px-4
+                  text-sm
+                  font-semibold
+                  text-white
+                  shadow
+                  transition
+                  hover:bg-red-700
+                  disabled:cursor-not-allowed
+                  disabled:opacity-40
+                "
+              >
+
+                <Trash2
+                  size={17}
+                />
+
+                Eliminar seleccionadas
+
+              </button>
+
+
+              <button
+                type="button"
+                onClick={
+                  cancelDeleteMode
+                }
+                className="
+                  min-h-10
+                  rounded-full
+                  bg-[#eee4f2]
+                  px-4
+                  text-sm
+                  font-semibold
+                  text-[#765071]
+                "
+              >
+                Cancelar
+              </button>
 
             </div>
 
@@ -4012,7 +4501,8 @@ function closeBulkDeleteModal() {
       {
         tab ===
           "mine" &&
-        !selectionMode && (
+        !selectionMode &&
+        !deleteMode && (
 
           <div
             className="
@@ -4025,16 +4515,22 @@ function closeBulkDeleteModal() {
               text-[#745c70]
             "
           >
+
             Has compartido{" "}
+
             <strong>
               {visiblePhotos.length}
-            </strong>{" "}
+            </strong>
+
+            {" "}
+
             {
               visiblePhotos.length ===
                 1
                 ? "recuerdo"
                 : "recuerdos"
             }.
+
           </div>
 
         )
@@ -4044,7 +4540,8 @@ function closeBulkDeleteModal() {
       {
         tab ===
           "favorites" &&
-        !selectionMode && (
+        !selectionMode &&
+        !deleteMode && (
 
           <div
             className="
@@ -4089,13 +4586,17 @@ function closeBulkDeleteModal() {
               <div
                 className="text-4xl"
               >
+
                 {
-                  tab === "favorites"
+                  tab ===
+                    "favorites"
                     ? "❤️"
-                    : tab === "mine"
+                    : tab ===
+                        "mine"
                       ? "📷"
                       : "✨"
                 }
+
               </div>
 
 
@@ -4106,13 +4607,17 @@ function closeBulkDeleteModal() {
                   text-[#674e62]
                 "
               >
+
                 {
-                  tab === "favorites"
+                  tab ===
+                    "favorites"
                     ? "Todavía no hay favoritos."
-                    : tab === "mine"
+                    : tab ===
+                        "mine"
                       ? "Todavía no has compartido fotografías."
                       : "Todavía no hay recuerdos compartidos."
                 }
+
               </p>
 
             </div>
@@ -4134,7 +4639,7 @@ function closeBulkDeleteModal() {
             >
 
               {
-                visiblePhotos.map(
+                galleryPhotos.map(
                   (
                     photo
                   ) => {
@@ -4156,6 +4661,17 @@ function closeBulkDeleteModal() {
                       );
 
 
+                    const isDeleteSelected =
+                      deleteSelectedIds.has(
+                        photo.id
+                      );
+
+
+                    const deleteDisabled =
+                      deleteMode &&
+                      !isOwner;
+
+
                     return (
 
                       <article
@@ -4171,12 +4687,22 @@ function closeBulkDeleteModal() {
                           shadow-md
                           transition-all
                           duration-300
-                          hover:-translate-y-1
-                          hover:shadow-xl
 
                           ${
                             isSelected
                               ? "ring-4 ring-[#765071] ring-offset-2"
+                              : ""
+                          }
+
+                          ${
+                            isDeleteSelected
+                              ? "ring-4 ring-red-500 ring-offset-2"
+                              : ""
+                          }
+
+                          ${
+                            deleteDisabled
+                              ? "opacity-40"
                               : ""
                           }
                         `}
@@ -4184,8 +4710,25 @@ function closeBulkDeleteModal() {
 
                         <button
                           type="button"
+                          disabled={
+                            deleteDisabled
+                          }
                           onClick={
                             () => {
+
+                              if (
+                                deleteMode
+                              ) {
+
+                                toggleDeleteSelection(
+                                  photo
+                                );
+
+
+                                return;
+
+                              }
+
 
                               if (
                                 selectionMode
@@ -4194,6 +4737,7 @@ function closeBulkDeleteModal() {
                                 togglePhotoSelection(
                                   photo
                                 );
+
 
                                 return;
 
@@ -4210,6 +4754,7 @@ function closeBulkDeleteModal() {
                             block
                             w-full
                             overflow-hidden
+                            disabled:cursor-not-allowed
                           "
                         >
 
@@ -4252,8 +4797,31 @@ function closeBulkDeleteModal() {
                             )
                           }
 
+
+                          {
+                            deleteMode &&
+                            isOwner && (
+
+                              <span
+                                className={`
+                                  absolute
+                                  inset-0
+
+                                  ${
+                                    isDeleteSelected
+                                      ? "bg-red-600/25"
+                                      : "bg-black/5"
+                                  }
+                                `}
+                              />
+
+                            )
+                          }
+
                         </button>
 
+
+                        {/* CHECK DESCARGA */}
 
                         {
                           selectionMode && (
@@ -4308,8 +4876,65 @@ function closeBulkDeleteModal() {
                         }
 
 
+                        {/* CHECK ELIMINACIÓN */}
+
+                        {
+                          deleteMode &&
+                          isOwner && (
+
+                            <button
+                              type="button"
+                              onClick={
+                                () =>
+                                  toggleDeleteSelection(
+                                    photo
+                                  )
+                              }
+                              className={`
+                                absolute
+                                right-2
+                                top-2
+                                z-10
+                                flex
+                                h-10
+                                w-10
+                                items-center
+                                justify-center
+                                rounded-full
+                                shadow-lg
+
+                                ${
+                                  isDeleteSelected
+                                    ? "bg-red-600 text-white"
+                                    : "bg-white/95 text-red-600"
+                                }
+                              `}
+                            >
+
+                              {
+                                isDeleteSelected
+                                  ? (
+                                    <Check
+                                      size={22}
+                                      strokeWidth={3}
+                                    />
+                                  )
+                                  : (
+                                    <Trash2
+                                      size={19}
+                                    />
+                                  )
+                              }
+
+                            </button>
+
+                          )
+                        }
+
+
                         {
                           !selectionMode &&
+                          !deleteMode &&
                           photo.is_featured && (
 
                             <span
@@ -4346,6 +4971,7 @@ function closeBulkDeleteModal() {
 
                         {
                           !selectionMode &&
+                          !deleteMode &&
                           isOwner && (
 
                             <span
@@ -4370,7 +4996,34 @@ function closeBulkDeleteModal() {
 
 
                         {
-                          !selectionMode && (
+                          deleteMode &&
+                          !isOwner && (
+
+                            <span
+                              className="
+                                absolute
+                                inset-x-2
+                                bottom-2
+                                rounded-full
+                                bg-black/70
+                                px-2
+                                py-1.5
+                                text-center
+                                text-[10px]
+                                font-medium
+                                text-white
+                              "
+                            >
+                              Foto de otro invitado
+                            </span>
+
+                          )
+                        }
+
+
+                        {
+                          !selectionMode &&
+                          !deleteMode && (
 
                             <button
                               type="button"
@@ -4434,12 +5087,13 @@ function closeBulkDeleteModal() {
 
 
       {/* ===================================================
-          VISOR REALMENTE FULLSCREEN
+          VISOR FULLSCREEN
       ==================================================== */}
 
       {
         openPhoto &&
-        !selectionMode && (
+        !selectionMode &&
+        !deleteMode && (
 
           <ModalPortal>
 
@@ -4469,8 +5123,6 @@ function closeBulkDeleteModal() {
                   sm:px-6
                 "
               >
-
-                {/* CABECERA */}
 
                 <div
                   className="
@@ -4512,8 +5164,6 @@ function closeBulkDeleteModal() {
                 </div>
 
 
-                {/* IMAGEN */}
-
                 <div
                   className="
                     relative
@@ -4522,7 +5172,6 @@ function closeBulkDeleteModal() {
                     overflow-hidden
                   "
                 >
-
 
                   {
                     viewerError && (
@@ -4546,93 +5195,91 @@ function closeBulkDeleteModal() {
                   }
 
 
-{/* VERSIÓN LIGERA INMEDIATA */}
+                  <img
+                    key={
+                      `preview-${openPhoto.id}`
+                    }
+                    src={
+                      getViewerPreviewUrl(
+                        openPhoto.secure_url
+                      )
+                    }
+                    alt=""
+                    aria-hidden="true"
+                    className={`
+                      absolute
+                      inset-0
+                      h-full
+                      w-full
+                      select-none
+                      object-contain
+                      transition-opacity
+                      duration-300
 
-<img
-  key={
-    `preview-${openPhoto.id}`
-  }
-  src={
-    getViewerPreviewUrl(
-      openPhoto.secure_url
-    )
-  }
-  alt=""
-  aria-hidden="true"
-  className={`
-    absolute
-    inset-0
-    h-full
-    w-full
-    select-none
-    object-contain
-    transition-opacity
-    duration-300
-
-    ${
-      viewerLoading
-        ? "opacity-100"
-        : "opacity-0"
-    }
-  `}
-/>
+                      ${
+                        viewerLoading
+                          ? "opacity-100"
+                          : "opacity-0"
+                      }
+                    `}
+                  />
 
 
-{/* VERSIÓN DE ALTA CALIDAD */}
+                  <img
+                    key={
+                      openPhoto.id
+                    }
+                    src={
+                      getViewerUrl(
+                        openPhoto.secure_url
+                      )
+                    }
+                    alt="Recuerdo ampliado"
+                    onLoad={
+                      () => {
 
-<img
-  key={
-    openPhoto.id
-  }
-  src={
-    getViewerUrl(
-      openPhoto.secure_url
-    )
-  }
-  alt="Recuerdo ampliado"
-  onLoad={
-    () => {
+                        setViewerLoading(
+                          false
+                        );
 
-      setViewerLoading(
-        false
-      );
 
-      setViewerError(
-        false
-      );
+                        setViewerError(
+                          false
+                        );
 
-    }
-  }
-  onError={
-    () => {
+                      }
+                    }
+                    onError={
+                      () => {
 
-      setViewerLoading(
-        false
-      );
+                        setViewerLoading(
+                          false
+                        );
 
-      setViewerError(
-        true
-      );
 
-    }
-  }
-  className={`
-    absolute
-    inset-0
-    h-full
-    w-full
-    select-none
-    object-contain
-    transition-opacity
-    duration-300
+                        setViewerError(
+                          true
+                        );
 
-    ${
-      viewerLoading
-        ? "opacity-0"
-        : "opacity-100"
-    }
-  `}
-/>
+                      }
+                    }
+                    className={`
+                      absolute
+                      inset-0
+                      h-full
+                      w-full
+                      select-none
+                      object-contain
+                      transition-opacity
+                      duration-300
+
+                      ${
+                        viewerLoading
+                          ? "opacity-0"
+                          : "opacity-100"
+                      }
+                    `}
+                  />
 
 
                   {
@@ -4716,8 +5363,6 @@ function closeBulkDeleteModal() {
 
                 </div>
 
-
-                {/* ACCIONES */}
 
                 <div
                   className="
@@ -4806,7 +5451,7 @@ function closeBulkDeleteModal() {
 
                   {
                     openPhoto.owner_id ===
-                    userId && (
+                      userId && (
 
                       <button
                         type="button"
@@ -4854,7 +5499,7 @@ function closeBulkDeleteModal() {
 
 
       {/* ===================================================
-          MODAL ELIMINAR
+          MODAL ELIMINAR UNA
       ==================================================== */}
 
       {
@@ -4965,7 +5610,7 @@ function closeBulkDeleteModal() {
                     type="button"
                     disabled={
                       deletingPhotoId !==
-                      null
+                        null
                     }
                     onClick={
                       () =>
@@ -4990,7 +5635,7 @@ function closeBulkDeleteModal() {
                     type="button"
                     disabled={
                       deletingPhotoId !==
-                      null
+                        null
                     }
                     onClick={
                       () =>
@@ -5018,6 +5663,7 @@ function closeBulkDeleteModal() {
                             <Trash2
                               size={18}
                             />
+
                             Eliminar
                           </>
                         )
@@ -5038,12 +5684,536 @@ function closeBulkDeleteModal() {
 
 
       {/* ===================================================
+          MODAL ELIMINAR VARIAS
+      ==================================================== */}
+
+      {
+        bulkDeleteStatus !==
+          "idle" && (
+
+          <ModalPortal>
+
+            <div
+              className="
+                fixed
+                inset-0
+                z-[10500]
+                flex
+                h-[100dvh]
+                w-screen
+                items-center
+                justify-center
+                overflow-hidden
+                bg-black/70
+                p-4
+                backdrop-blur-md
+              "
+              role="dialog"
+              aria-modal="true"
+            >
+
+              <div
+                className="
+                  w-full
+                  max-w-md
+                  rounded-[30px]
+                  bg-[#fffaf4]
+                  p-6
+                  shadow-2xl
+                "
+              >
+
+                {
+                  bulkDeleteStatus ===
+                    "confirm" && (
+
+                    <>
+
+                      <div
+                        className="
+                          mx-auto
+                          flex
+                          h-16
+                          w-16
+                          items-center
+                          justify-center
+                          rounded-full
+                          bg-red-100
+                          text-red-600
+                        "
+                      >
+
+                        <Trash2
+                          size={29}
+                        />
+
+                      </div>
+
+
+                      <h3
+                        className="
+                          mt-5
+                          text-center
+                          text-2xl
+                          font-semibold
+                          text-[#543550]
+                        "
+                      >
+                        Eliminar recuerdos
+                      </h3>
+
+
+                      <p
+                        className="
+                          mt-3
+                          text-center
+                          text-sm
+                          leading-6
+                          text-[#82697d]
+                        "
+                      >
+
+                        Estás a punto de eliminar{" "}
+
+                        <strong>
+                          {pendingDeletePhotos.length}
+                        </strong>
+
+                        {" "}
+
+                        {
+                          pendingDeletePhotos.length ===
+                            1
+                            ? "fotografía"
+                            : "fotografías"
+                        }.
+
+                      </p>
+
+
+                      <div
+                        className="
+                          mt-4
+                          rounded-2xl
+                          bg-red-50
+                          px-4
+                          py-3
+                          text-center
+                          text-sm
+                          leading-6
+                          text-red-700
+                        "
+                      >
+                        Esta acción es permanente y no se puede deshacer.
+                      </div>
+
+
+                      <div
+                        className="
+                          mt-6
+                          grid
+                          grid-cols-2
+                          gap-3
+                        "
+                      >
+
+                        <button
+                          type="button"
+                          onClick={
+                            cancelBulkDeleteConfirmation
+                          }
+                          className="
+                            min-h-12
+                            rounded-full
+                            bg-[#eee4f2]
+                            px-4
+                            font-semibold
+                            text-[#765071]
+                          "
+                        >
+                          Cancelar
+                        </button>
+
+
+                        <button
+                          type="button"
+                          onClick={
+                            () =>
+                              void confirmBulkDelete()
+                          }
+                          className="
+                            flex
+                            min-h-12
+                            items-center
+                            justify-center
+                            gap-2
+                            rounded-full
+                            bg-red-600
+                            px-4
+                            font-semibold
+                            text-white
+                            shadow
+                          "
+                        >
+
+                          <Trash2
+                            size={18}
+                          />
+
+                          Eliminar{" "}
+                          {pendingDeletePhotos.length}
+
+                        </button>
+
+                      </div>
+
+                    </>
+
+                  )
+                }
+
+
+                {
+                  bulkDeleteStatus ===
+                    "running" && (
+
+                    <>
+
+                      <div
+                        className="
+                          mx-auto
+                          flex
+                          h-16
+                          w-16
+                          items-center
+                          justify-center
+                          rounded-full
+                          bg-red-100
+                          text-red-600
+                        "
+                      >
+
+                        <LoaderCircle
+                          size={29}
+                          className="
+                            animate-spin
+                          "
+                        />
+
+                      </div>
+
+
+                      <h3
+                        className="
+                          mt-5
+                          text-center
+                          text-2xl
+                          font-semibold
+                          text-[#543550]
+                        "
+                      >
+                        Eliminando recuerdos...
+                      </h3>
+
+
+                      <p
+                        className="
+                          mt-3
+                          text-center
+                          text-sm
+                          text-[#82697d]
+                        "
+                      >
+
+                        {bulkDeleteCurrent}
+                        {" "}
+                        de
+                        {" "}
+                        {bulkDeleteTotal}
+                        {" "}
+                        fotografías
+
+                      </p>
+
+
+                      <div
+                        className="
+                          mt-5
+                          h-3
+                          overflow-hidden
+                          rounded-full
+                          bg-red-100
+                        "
+                      >
+
+                        <div
+                          className="
+                            h-full
+                            rounded-full
+                            bg-red-600
+                            transition-all
+                            duration-300
+                          "
+                          style={{
+                            width:
+                              `${bulkDeletePercentage}%`
+                          }}
+                        />
+
+                      </div>
+
+
+                      <p
+                        className="
+                          mt-2
+                          text-center
+                          text-sm
+                          font-semibold
+                          text-red-600
+                        "
+                      >
+                        {bulkDeletePercentage}%
+                      </p>
+
+
+                      <p
+                        className="
+                          mt-4
+                          text-center
+                          text-xs
+                          leading-5
+                          text-[#92798c]
+                        "
+                      >
+                        No cierres esta ventana hasta que termine.
+                      </p>
+
+                    </>
+
+                  )
+                }
+
+
+                {
+                  bulkDeleteStatus ===
+                    "completed" && (
+
+                    <>
+
+                      <div
+                        className="
+                          mx-auto
+                          flex
+                          h-16
+                          w-16
+                          items-center
+                          justify-center
+                          rounded-full
+                          bg-[#e8f0e5]
+                          text-2xl
+                          font-bold
+                          text-[#55704f]
+                        "
+                      >
+                        ✓
+                      </div>
+
+
+                      <h3
+                        className="
+                          mt-5
+                          text-center
+                          text-2xl
+                          font-semibold
+                          text-[#543550]
+                        "
+                      >
+                        Recuerdos eliminados
+                      </h3>
+
+
+                      <p
+                        className="
+                          mt-3
+                          text-center
+                          text-sm
+                          leading-6
+                          text-[#82697d]
+                        "
+                      >
+
+                        Se eliminaron correctamente{" "}
+
+                        <strong>
+                          {bulkDeleteTotal}
+                        </strong>
+
+                        {" "}
+
+                        {
+                          bulkDeleteTotal ===
+                            1
+                            ? "fotografía"
+                            : "fotografías"
+                        }.
+
+                      </p>
+
+
+                      <button
+                        type="button"
+                        onClick={
+                          closeBulkDeleteModal
+                        }
+                        className="
+                          mt-6
+                          min-h-12
+                          w-full
+                          rounded-full
+                          bg-[#765071]
+                          px-5
+                          font-semibold
+                          text-white
+                        "
+                      >
+                        Cerrar
+                      </button>
+
+                    </>
+
+                  )
+                }
+
+
+                {
+                  bulkDeleteStatus ===
+                    "error" && (
+
+                    <>
+
+                      <div
+                        className="
+                          mx-auto
+                          flex
+                          h-16
+                          w-16
+                          items-center
+                          justify-center
+                          rounded-full
+                          bg-red-100
+                          text-red-600
+                        "
+                      >
+
+                        <AlertTriangle
+                          size={29}
+                        />
+
+                      </div>
+
+
+                      <h3
+                        className="
+                          mt-5
+                          text-center
+                          text-2xl
+                          font-semibold
+                          text-[#543550]
+                        "
+                      >
+                        Eliminación interrumpida
+                      </h3>
+
+
+                      <p
+                        className="
+                          mt-3
+                          text-center
+                          text-sm
+                          leading-6
+                          text-[#82697d]
+                        "
+                      >
+
+                        Se eliminaron{" "}
+
+                        <strong>
+                          {bulkDeleteCurrent}
+                        </strong>
+
+                        {" "}
+                        de{" "}
+                        {bulkDeleteTotal}
+                        {" "}
+                        fotografías.
+
+                      </p>
+
+
+                      {
+                        bulkDeleteError && (
+
+                          <div
+                            className="
+                              mt-4
+                              rounded-2xl
+                              bg-red-50
+                              px-4
+                              py-3
+                              text-center
+                              text-xs
+                              leading-5
+                              text-red-700
+                            "
+                          >
+                            {bulkDeleteError}
+                          </div>
+
+                        )
+                      }
+
+
+                      <button
+                        type="button"
+                        onClick={
+                          closeBulkDeleteModal
+                        }
+                        className="
+                          mt-6
+                          min-h-12
+                          w-full
+                          rounded-full
+                          bg-[#765071]
+                          px-5
+                          font-semibold
+                          text-white
+                        "
+                      >
+                        Cerrar
+                      </button>
+
+                    </>
+
+                  )
+                }
+
+              </div>
+
+            </div>
+
+          </ModalPortal>
+
+        )
+      }
+
+
+      {/* ===================================================
           MODAL DESCARGA
       ==================================================== */}
 
       {
         downloadStatus !==
-        "idle" && (
+          "idle" && (
 
           <ModalPortal>
 
@@ -5081,7 +6251,7 @@ function closeBulkDeleteModal() {
 
                 {
                   downloadStatus ===
-                  "confirm" && (
+                    "confirm" && (
 
                     <>
 
@@ -5128,16 +6298,22 @@ function closeBulkDeleteModal() {
                           text-[#82697d]
                         "
                       >
+
                         Vas a descargar{" "}
+
                         <strong>
                           {pendingDownloadPhotos.length}
-                        </strong>{" "}
+                        </strong>
+
+                        {" "}
+
                         {
                           pendingDownloadPhotos.length ===
                             1
                             ? "fotografía"
                             : "fotografías"
                         }.
+
                       </p>
 
 
@@ -5238,7 +6414,7 @@ function closeBulkDeleteModal() {
 
                 {
                   downloadStatus ===
-                  "running" && (
+                    "running" && (
 
                     <>
 
@@ -5287,6 +6463,7 @@ function closeBulkDeleteModal() {
                           text-[#82697d]
                         "
                       >
+
                         {downloadCurrent}
                         {" "}
                         de
@@ -5294,6 +6471,7 @@ function closeBulkDeleteModal() {
                         {downloadTotal}
                         {" "}
                         fotografías
+
                       </p>
 
 
@@ -5364,7 +6542,7 @@ function closeBulkDeleteModal() {
 
                 {
                   downloadStatus ===
-                  "completed" && (
+                    "completed" && (
 
                     <>
 
@@ -5441,7 +6619,7 @@ function closeBulkDeleteModal() {
 
                 {
                   downloadStatus ===
-                  "cancelled" && (
+                    "cancelled" && (
 
                     <>
 
@@ -5458,9 +6636,11 @@ function closeBulkDeleteModal() {
                           text-[#a4405c]
                         "
                       >
+
                         <X
                           size={25}
                         />
+
                       </div>
 
 
@@ -5486,6 +6666,7 @@ function closeBulkDeleteModal() {
                           text-[#82697d]
                         "
                       >
+
                         {downloadCurrent}
                         {" "}
                         de
@@ -5493,6 +6674,7 @@ function closeBulkDeleteModal() {
                         {downloadTotal}
                         {" "}
                         fotografías fueron procesadas.
+
                       </p>
 
 
@@ -5523,7 +6705,7 @@ function closeBulkDeleteModal() {
 
                 {
                   downloadStatus ===
-                  "error" && (
+                    "error" && (
 
                     <>
 
@@ -5540,9 +6722,11 @@ function closeBulkDeleteModal() {
                           text-red-600
                         "
                       >
+
                         <AlertTriangle
                           size={27}
                         />
+
                       </div>
 
 
@@ -5567,6 +6751,7 @@ function closeBulkDeleteModal() {
                           text-[#82697d]
                         "
                       >
+
                         {downloadCurrent}
                         {" "}
                         de
@@ -5574,6 +6759,7 @@ function closeBulkDeleteModal() {
                         {downloadTotal}
                         {" "}
                         fotografías fueron procesadas.
+
                       </p>
 
 
@@ -5685,7 +6871,8 @@ function closeBulkDeleteModal() {
                     rounded-full
 
                     ${
-                      notice.tone === "error"
+                      notice.tone ===
+                        "error"
                         ? "bg-red-100 text-red-600"
                         : "bg-[#eee4f2] text-[#765071]"
                     }
